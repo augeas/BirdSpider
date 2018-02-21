@@ -28,21 +28,6 @@ tweetFields = [u'text',u'in_reply_to_status_id',u'id',u'favorite_count',u'source
     u'in_reply_to_screen_name',u'id_str',u'retweet_count',u'in_reply_to_user_id',u'favorited',
     u'in_reply_to_user_id_str',u'possibly_sensitive',u'lang',u'created_at',u'in_reply_to_status_id_str'] + [u'isotime',u'last_scraped',u'__temp_label__']
 
-userIndex = neoDb.get_or_create_index(neo4j.Node, 'twitter_user')
-tweetIndex = neoDb.get_or_create_index(neo4j.Node, 'tweet')
-retweetIndex = neoDb.get_or_create_index(neo4j.Node, 'retweet')
-friendIndex = neoDb.get_or_create_index(neo4j.Relationship, 'friends')
-
-#def buildNeoIndices():
-#    indices = [{'label':'twitter_user','keys':['screen_name']},{'label':'tweet','keys':['id']}]
-#    #existing = neoDb.get_indexes(neo4j.Node)
-#    for index in indices:
-#        for key in index['keys']:
-#            try:		
-#                neoDb.schema.create_index(index['label'],key)
-#            except:
-#                pass
-
 class ratedTwitter(object):
     """Wrapper around the Twython class that tracks whether API calls are rate-limited."""
     def __can_we_do_that__(self,methodName):
@@ -157,10 +142,6 @@ def cypherVal(val):
 # Return Twitter's time format as isoformat.
 twitterTime = lambda d: datetime.strptime(re.sub('[+\-][0-9]{4}\s','',d),'%a %b %d %X %Y').isoformat()
 
-#def twitterUser2Cypher(user):
-#    return u'('+user['screen_name']+u':twitter_user { '+ u', '.join([ field+u":"+ cypherVal(user[field])
-#        for field in  twitterUserFields if user.get(field,False) ]) + u' })'
-
 def renderTwitterUser(user):
     """Return a serializable dictionary of relevant fields for a Twitter user."""
     twit = dict([ (field,user[field]) for field in  twitterUserFields if user.get(field,False) ]) # Strip out the stuff we don't want to store.
@@ -184,10 +165,6 @@ def pushUsers2Neo(renderedTwits):
         except:
             pass
                 
-#def tweet2Cypher(tweet):
-#    return u'('+tweet['id_str']+u':tweet { '+ u', '.join([field+u":"+ cypherVal(tweet[field])
-#       for field in tweetFields if tweet.get(field,False)]) + u' })'
-
 def renderTweet(tweet):
     """Return a serializable dictionary of relevant fields for a tweet."""
     rendered = dict([ (field,tweet[field]) for field in  tweetFields if tweet.get(field,False) ])
@@ -286,17 +263,18 @@ def tweets2Neo(user,tweetDump):
 
     batch = neo4j.WriteBatch(neoDb)
 
+    # THESE MUST DIE.
     # Various Neo4J indices.
-    hashIndex = neoDb.get_or_create_index(neo4j.Node, 'hashtag')
-    urlIndex = neoDb.get_or_create_index(neo4j.Node, 'url')
-    tweetedIndex = neoDb.get_or_create_index(neo4j.Relationship, 'tweeted')
-    retweetedIndex = neoDb.get_or_create_index(neo4j.Relationship, 'retweeted')
-    retweetedOfIndex = neoDb.get_or_create_index(neo4j.Relationship, 'retweet of')
-    mentionIndex = neoDb.get_or_create_index(neo4j.Relationship, 'mentioned')
-    tweetReplyIndex = neoDb.get_or_create_index(neo4j.Relationship, 'tweet_reply')
-    userReplyIndex = neoDb.get_or_create_index(neo4j.Relationship, 'user_reply')
-    taggedIndex = neoDb.get_or_create_index(neo4j.Relationship, 'tagged')
-    linkedIndex = neoDb.get_or_create_index(neo4j.Relationship, 'linked')
+    #hashIndex = neoDb.get_or_create_index(neo4j.Node, 'hashtag')
+    #urlIndex = neoDb.get_or_create_index(neo4j.Node, 'url')
+    #tweetedIndex = neoDb.get_or_create_index(neo4j.Relationship, 'tweeted')
+    #retweetedIndex = neoDb.get_or_create_index(neo4j.Relationship, 'retweeted')
+    #retweetedOfIndex = neoDb.get_or_create_index(neo4j.Relationship, 'retweet of')
+    #mentionIndex = neoDb.get_or_create_index(neo4j.Relationship, 'mentioned')
+    #tweetReplyIndex = neoDb.get_or_create_index(neo4j.Relationship, 'tweet_reply')
+    #userReplyIndex = neoDb.get_or_create_index(neo4j.Relationship, 'user_reply')
+    #taggedIndex = neoDb.get_or_create_index(neo4j.Relationship, 'tagged')
+    #linkedIndex = neoDb.get_or_create_index(neo4j.Relationship, 'linked')
 
 # Adding labels to indexed nodes is broken, hence the __temp_label__ field.
 # See the small footnote here: http://stackoverflow.com/questions/20010509/failed-writebatch-operation-with-py2neo
@@ -593,19 +571,3 @@ def nextNearest(user,job,test=False):
         print 'No more '+job+' for '+user
     
     return False
-
-
-#{u'attributes': {},
-# u'bounding_box': {u'coordinates': [[[-0.14205790000000001, 51.5185518],
-#    [-0.076305, 51.5185518],
-#    [-0.076305, 51.575300999999996],
-#    [-0.14205790000000001, 51.575300999999996]]],
-#  u'type': u'Polygon'},
-# u'contained_within': [],
-# u'country': u'United Kingdom',
-# u'country_code': u'GB',
-# u'full_name': u'Islington, London',
-# u'id': u'9c37c76f5dfad0fa',
-# u'name': u'Islington',
-# u'place_type': u'city',
-# u'url': u'https://api.twitter.com/1.1/geo/id/9c37c76f5dfad0fa.json'}
