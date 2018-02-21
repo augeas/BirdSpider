@@ -8,7 +8,6 @@ import json
 import pprint
 import re
 
-from cassandra.cluster import Cluster
 from py2neo import cypher, neo4j, node, rel
 import redis
 from twython import Twython, TwythonAuthError, TwythonRateLimitError, TwythonError
@@ -28,9 +27,6 @@ u'screen_name', u'lang',u'favourites_count',u'name', u'url', u'created_at', u'ti
 tweetFields = [u'text',u'in_reply_to_status_id',u'id',u'favorite_count',u'source',u'retweeted',
     u'in_reply_to_screen_name',u'id_str',u'retweet_count',u'in_reply_to_user_id',u'favorited',
     u'in_reply_to_user_id_str',u'possibly_sensitive',u'lang',u'created_at',u'in_reply_to_status_id_str'] + [u'isotime',u'last_scraped',u'__temp_label__']
-
-cassTwitterUserFields = twitterUserFields[:-1]
-cassTweetFields = tweetFields[:-1] + ['user_id_str']
 
 userIndex = neoDb.get_or_create_index(neo4j.Node, 'twitter_user')
 tweetIndex = neoDb.get_or_create_index(neo4j.Node, 'tweet')
@@ -187,40 +183,7 @@ def pushUsers2Neo(renderedTwits):
             twitNode.add_labels('twitter_user')
         except:
             pass
-        
-def quoteCassVal(v):
-    """Convert a value into a suitable string for Cassandra, enclosing in quoutes and escaping as needed."""
-    if  isinstance(v,(int,long,bool)):
-        return str(v)    
-    return "'"+unicode(re.sub("'","''",v))+"'"
-
-def pushUsers2Cass(renderedTwits,cassSession=False):
-    """Store a list of rendered Twitter users in Cassandra.
-       
-    Positional arguments:
-    renderedTwits -- a list of Twitter users rendered by "renderTwitterUser"
-
-    Keyword arguments:
-    cassSession -- Cassandra session, created using the default db_settings if not supplied
-
-    """ 
-    if not cassSession:
-        cassCluster = Cluster()
-        cassSession = cassCluster.connect()
-        cassSession.set_keyspace('socialminer')
-    query = 'BEGIN BATCH'
-    for twit in renderedTwits: # Produce corresponding lists of field-names and their values.
-        twitKeys, twitValues = zip(*[ (key,twit[key]) for key in cassTwitterUserFields if twit.get(key,False) ])
-        quotedValues = [ quoteCassVal(v) for v in twitValues ]
-        lookUpValues = [ "'"+v+"'" for v in [twit['id_str'],twit['screen_name']] ] # Values for the denormalised twitter_user_lookup table.
-        query += ' INSERT INTO twitter_user ('+', '.join(twitKeys)+') VALUES ('+ ', '.join(quotedValues)+');'
-        query += ' INSERT INTO twitter_user_lookup (id_str,screen_name) VALUES ('+', '.join(lookUpValues)+');'
-    query += ' APPLY BATCH'
-
-    try:
-        cassSession.execute(query)
-    except:
-        print query
+                
 #def tweet2Cypher(tweet):
 #    return u'('+tweet['id_str']+u':tweet { '+ u', '.join([field+u":"+ cypherVal(tweet[field])
 #       for field in tweetFields if tweet.get(field,False)]) + u' })'
@@ -469,98 +432,6 @@ def tweets2Neo(user,tweetDump):
     howLong = (datetime.now() - started).seconds
     print '*** '+user+': PUSHED '+str(len(tweetDump['tweets']))+' TWEETS TO NEO IN '+str(howLong)+'s ***'
 
-def cassInsert(table,fields,values):
-    quotedValues = quotedValues = [ str(v) if isinstance(v,(int,long,bool)) else "'"+unicode(re.sub("'","''",v))+"'" for v in values ]
-    return ' INSERT INTO '+table+' ('+', '.join(fields)+') VALUES ('+', '.join(quotedValues)+');'
-
-def tweets2Cass(user,tweetDump):
-
-    started = datetime.now()
-
-    cassCluster = Cluster()
-    cassSession = cassCluster.connect()
-    cassSession.set_keyspace('socialminer')
-
-    try:
-        userIdStr = cassSession.execute("SELECT id_str from twitter_user_lookup WHERE screen_name='"+user+"';")[0][0]
-    except:
-        return 
-
-    def unpackTweet(tw):
-        tw['user_id_str'] = tw['user']['id_str']
-        twKeys, twValues = zip(*[ (key,tw[key]) for key in cassTweetFields if tw.get(key,False) ])
-        return twKeys,twValues
-        
-    query = 'BEGIN BATCH'
-    
-    userTweetFields = ['user_id_str','isotime','id_str']
-    retweetByFields = ['rt_user_id_str','user_id_str','isotime','id_str','rt_id_str']
-    retweetOfFields = ['user_id_str','rt_user_id_str','isotime','id_str','rt_id_str']
-    mentionsFields = ['target_id_str','user_id_str','tweet_id_str','isotime']
-    taggedTweetFields = ['text','user_id_str','tweet_id_str','isotime']
-    twitterLinkFields = ['url','expanded_url','user_id_str','tweet_id_str','isotime']
-    twitterReplyFields = ['reply_id_str','reply_user_id_str','isotime','id_str','user_id_str'] 
- 
-    for tweet in tweetDump['tweets']:
-        tweetKeys,tweetValues = unpackTweet(tweet)
-        query += cassInsert('tweet',tweetKeys,tweetValues)
-        query += cassInsert('user_tweet',userTweetFields,[ tweet[f] for f in userTweetFields ])
-        
-    for retweet in tweetDump['retweets']:
-        status,rt = retweet
-        
-        tweetKeys,tweetValues = unpackTweet(status)
-        query += cassInsert('tweet',tweetKeys,tweetValues)
-        query += cassInsert('user_tweet',userTweetFields,[ tweet[f] for f in userTweetFields ])
-        
-        query += cassInsert('retweet_by',retweetByFields,[rt['user']['id_str'],status['user']['id_str'],rt['isotime'],status['id_str'],rt['id_str']])
-        query += cassInsert('retweet_of',retweetByFields,[status['user']['id_str'],rt['user']['id_str'],rt['isotime'],status['id_str'],rt['id_str']])
-
-    for mention in tweetDump['mentions']:
-        tweet,twit = mention
-        mentionVals = [tweet['user']['id_str'],userIdStr,tweet['id_str'],tweet['isotime']]
-        query += cassInsert('twitter_mentions_of',mentionsFields,mentionVals)
-        query += cassInsert('twitter_mentions_by',mentionsFields,mentionVals)
-                
-    for hashTag in tweetDump['tags']:
-        tweet,tag = hashTag        
-        tagVals = [tag['text'],tweet['user']['id_str'],tweet['id_str'],tweet['isotime']]
-        query += cassInsert('tagged_tweet',taggedTweetFields,tagVals)
-        query += cassInsert('user_tagged_tweet',taggedTweetFields,tagVals)
-        
-    for URL in tweetDump['urls']:
-        tweet,url = URL
-        linkVals = [url['url'],url['expanded_url'],tweet['user']['id_str'],tweet['id_str'],tweet['isotime']]
-        query += cassInsert('twitter_links_by',twitterLinkFields,linkVals)
-        query += cassInsert('twitter_links_of',twitterLinkFields,linkVals)
-    
-    combinedReplies = {}
-   
-    for tweetReply in tweetDump['tweetReplies']:
-        reply, tweet = tweetReply
-        combinedReplies[reply['id_str']] = {'reply_user_id_str':reply['user']['id_str'], 'isotime':reply['isotime'], 'id_str':tweet['id_str']}
-        
-    for userReply in tweetDump['userReplies']:
-        tweet, twit = userReply
-        if combinedReplies.get(tweet['id_str'],False):
-            combinedReplies[tweet['id_str']]['user_id_str'] = twit['id_str']
-            
-    for replyIdStr in combinedReplies.keys():
-        try:
-            thisReply = combinedReplies[replyIdStr]
-            replyVals = [replyIdStr] + [ thisReply[f] for f in twitterReplyFields[1:] ]
-            query += cassInsert('twitter_replies_to',twitterReplyFields,replyVals)
-            query += cassInsert('twitter_replies_by',twitterReplyFields,replyVals)
-        except:
-            pass
-        
-    query += ' APPLY BATCH'
-    cassSession.execute(query)    
-
-    howLong = (datetime.now() - started).seconds
-    print '*** '+user+': PUSHED '+str(len(tweetDump['tweets']))+' TWEETS TO CASSANDRA IN '+str(howLong)+'s ***'
-
-
 def uniqueNeoRelation(a,b,rel):
     return u'CREATE UNIQUE ('+a+u')-[:`'+rel+u'`]->('+b+u')'
 
@@ -617,40 +488,6 @@ def pushConnections2Neo(user, renderedTwits, friends=True):
     howLong = (datetime.now() - started).seconds
     print '*** '+user+': PUSHED '+str(len(renderedTwits))+job+' TO NEO IN '+str(howLong)+'s ***'
         
-def pushConnections2Cass(user, renderedTwits, friends=True):
-
-    started = datetime.now()
-
-    cassCluster = Cluster()
-    cassSession = cassCluster.connect()
-    cassSession.set_keyspace('socialminer')
-
-    try:
-        userIdStr = [cassSession.execute("SELECT id_str from twitter_user_lookup WHERE screen_name='"+user+"';")[0][0]]
-    except:
-        print ""
-        return
-    
-    pushUsers2Cass(renderedTwits,cassSession)
-
-    if friends:
-        table = 'twitter_user_friends (id_str,friend_id_str,friend_screen_name) '
-        job = ' FRIENDS'
-        
-    else:
-        table = 'twitter_user_followers (id_str,follower_id_str,follower_screen_name) '
-        job = ' FOLLOWERS'
-
-    query = 'BEGIN BATCH'
-    for twit in renderedTwits:
-        twitValues = [ "'"+v+"'" for v in userIdStr+[twit['id_str'],twit['screen_name']] ]
-        query += " INSERT INTO "+table+" VALUES ("+ ', '.join(twitValues)+");"
-    query += ' APPLY BATCH'
-    
-    cassSession.execute(query)
-
-    howLong = (datetime.now() - started).seconds
-    print '*** '+user+': PUSHED '+str(len(renderedTwits))+job+' TO CASSANDRA IN '+str(howLong)+'s ***'
 
 def nextFriends(latest=False):
     """ Return a list of non-supernode users who have fewer friend relationships than Twitter thinks they should."""

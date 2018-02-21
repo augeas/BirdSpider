@@ -41,12 +41,8 @@ def pushRenderedTwits2Neo(twits):
     pushUsers2Neo(twits)
 
 @app.task
-def pushRenderedTwits2Cass(twits):
-    pushUsers2Cass(twits)
-
-@app.task
 def pushTwitterUsers(twits):
-    """Store Twitter users returned by a Twitter API call in Neo4J and Cassandra.
+    """Store Twitter users returned by a Twitter API call in Neo4J.
     
     Positional arguments:
     twits -- a list of Twitter users as returned by Twython
@@ -57,12 +53,10 @@ def pushTwitterUsers(twits):
         
     renderedTwits = [ renderTwitterUser(twit) for twit in twits ]
     pushRenderedTwits2Neo.delay(renderedTwits)
-    pushRenderedTwits2Cass.delay(renderedTwits)
-    #return True
 
 @app.task
 def getTwitterUsers(users,credentials=False):
-    """Look-up a set of Twitter users by screen_name and store them in Neo4J/Cassandra
+    """Look-up a set of Twitter users by screen_name and store them in Neo4J.
 
     Positional arguments:
     users -- a list of screen_names
@@ -74,10 +68,6 @@ def getTwitterUsers(users,credentials=False):
 @app.task
 def pushRenderedTweets2Neo(user,tweetDump):
     tweets2Neo(user,tweetDump)
-
-@app.task
-def pushRenderedTweets2Cass(user,tweetDump):
-    tweets2Cass(user,tweetDump)
     
 @app.task
 def pushRenderedTweets2Solr(tweets):
@@ -85,7 +75,7 @@ def pushRenderedTweets2Solr(tweets):
 
 @app.task
 def pushTweets(tweets,user,cacheKey=False):
-    """ Dump a set of tweets from a given user's timeline to Neo4J/Cassandra/Solr.
+    """ Dump a set of tweets from a given user's timeline to Neo4J/Solr.
 
     Positional arguments:
     tweets -- a list of tweets as returned by Twython.
@@ -99,7 +89,6 @@ def pushTweets(tweets,user,cacheKey=False):
     tweetDump = filterTweets(tweets) # Extract mentions, URLs, replies hashtags etc...
 
     pushRenderedTweets2Neo.delay(user,tweetDump) 
-    pushRenderedTweets2Cass.delay(user,tweetDump)
     pushRenderedTweets2Solr.delay(tweetDump['tweets']+tweetDump['retweets'])
 
     if cacheKey: # These are the last Tweets, tell the scaper we're done.
@@ -110,7 +99,7 @@ def pushTweets(tweets,user,cacheKey=False):
 
 @app.task
 def getTweets(user,maxTweets=3000,count=0,tweetId=0,cacheKey=False,credentials=False):
-    """Get tweets from the timeline of the given user, push them to Neo4J/Cassandra.
+    """Get tweets from the timeline of the given user, push them to Neo4J.
     
     Positional arguments:
     user -- The screen_name of the user
@@ -160,14 +149,10 @@ def getTweets(user,maxTweets=3000,count=0,tweetId=0,cacheKey=False,credentials=F
 @app.task
 def pushRenderedConnections2Neo(user,renderedTwits,friends=True):
     pushConnections2Neo(user,renderedTwits,friends=friends)
-    
-@app.task
-def pushRenderedConnections2Cass(user,renderedTwits,friends=True):
-    pushConnections2Cass(user,renderedTwits,friends=friends)  
-                    
+                        
 @app.task
 def pushTwitterConnections(twits,user,friends=True,cacheKey=False):
-    """Push the Twitter connections of a given user to Neo4J/Cassandra.
+    """Push the Twitter connections of a given user to Neo4J.
     
     Positional arguments:
     twits -- a list of Twitter users as returned by Twython
@@ -187,7 +172,6 @@ def pushTwitterConnections(twits,user,friends=True,cacheKey=False):
     if twits:
         renderedTwits = [ renderTwitterUser(twit) for twit in twits ]
         pushRenderedConnections2Neo.delay(user,renderedTwits,friends=friends)
-        pushRenderedConnections2Cass.delay(user,renderedTwits,friends=friends)
 # These are the last Tweets, tell the scaper we're done.
     if cacheKey: # These are the last connections, tell the scaper we're done.
         cache.set(cacheKey,'done')
@@ -195,7 +179,7 @@ def pushTwitterConnections(twits,user,friends=True,cacheKey=False):
                    
 @app.task
 def getTwitterConnections(user,friends=True,cursor = -1,credentials=False,cacheKey=False):
-    """Get the connections of the given user, push them to Neo4J/Cassandra.
+    """Get the connections of the given user, push them to Neo4J.
 
     Positional arguments:
     user -- The screen_name of the user
