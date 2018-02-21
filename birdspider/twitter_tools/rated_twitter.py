@@ -1,6 +1,7 @@
 
 from twython import Twython, TwythonAuthError, TwythonRateLimitError, TwythonError
 
+from db_setting import cache
 from twitter_settings import *
 
 class ratedTwitter(object):
