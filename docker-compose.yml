@@ -21,6 +21,16 @@ services:
       - docker-entrypoint.sh
       - solr-precreate
       - birdspider
+  redis:
+    container_name: birdspider_redis
+    image: redis
+    volumes:
+      - redis_data:/data
+  rabbitmq:
+    container_name: birdspider_mq
+    image: rabbitmq:alpine
 volumes:
   neo_data:
   solr_data:
+  redis_data:
+  
