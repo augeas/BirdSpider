@@ -36,6 +36,13 @@ services:
       - solr
       - redis
       - rabbitmq
+    environment:
+      - CONSUMER_KEY=${CONSUMER_KEY}
+      - CONSUMER_SECRET=${CONSUMER_SECRET}
+      - OAUTH_TOKEN=${OAUTH_TOKEN}
+      - OAUTH_TOKEN_SECRET=${OAUTH_TOKEN_SECRET}
+      - ACCESS_TOKEN=${ACCESS_TOKEN}
+          
 volumes:
   neo_data:
   solr_data:
