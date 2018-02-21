@@ -1,0 +1,8 @@
+celery
+networkx
+numpy
+py2neo
+redis
+requests
+twython
+

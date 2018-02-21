@@ -29,6 +29,8 @@ services:
   rabbitmq:
     container_name: birdspider_mq
     image: rabbitmq:alpine
+  birdspider:
+    build: .
 volumes:
   neo_data:
   solr_data:
