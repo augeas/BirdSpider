@@ -8,7 +8,7 @@ import json
 import pprint
 import re
 
-from py2neo import cypher, neo4j, node, rel
+from py2neo import cypher, Node, Relationship
 import redis
 from twython import Twython, TwythonAuthError, TwythonRateLimitError, TwythonError
 
