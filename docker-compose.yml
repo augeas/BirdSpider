@@ -1,0 +1,26 @@
+version: '2'
+services:
+  neo4j:
+    container_name: birdspider_neo
+    image: neo4j
+    ports:
+     - "7474:7474"
+     - "7687:7687"
+    environment:
+     - NEO4J_AUTH=none
+    volumes:
+     - neo_data:/data
+  solr:
+    container_name: birdspider_solr
+    image: solr:alpine
+    ports:
+     - "8983:8983"
+    volumes:
+      - solr_data:/opt/solr/server/solr/mycores
+    entrypoint:
+      - docker-entrypoint.sh
+      - solr-precreate
+      - birdspider
+volumes:
+  neo_data:
+  solr_data:
