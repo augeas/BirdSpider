@@ -5,7 +5,7 @@ import re
 
 from py2neo import cypher, neo4j, node, rel
 
-from socialminer.db_settings import *
+from db_settings import *
 
 def twitterFofQuery(user):
     fofQuery = """MATCH (a:twitter_user {screen_name:'SCREEN_NAME'})-[:FOLLOWS]->(b:twitter_user) WITH b

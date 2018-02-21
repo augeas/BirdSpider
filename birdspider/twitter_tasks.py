@@ -9,10 +9,10 @@ from datetime import datetime
 
 from celery import chain, group
 
-from socialminer.celery import app
-from socialminer.db_settings import cache
-from socialminer.twitter_settings import *
-from socialminer.twitter_tools import *
+from app import app
+from db_settings import cache
+from twitter_settings import *
+from twitter_tools import *
 
 @app.task
 def twitterCall(methodName,args,credentials=False):

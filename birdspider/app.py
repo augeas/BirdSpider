@@ -1,3 +1,4 @@
+#!/usr/bin/python
 from __future__ import absolute_import
 # Licensed under the Apache License Version 2.0: http://www.apache.org/licenses/LICENSE-2.0.txt
 
@@ -37,7 +38,7 @@ from celery import Celery
 #        return getattr(self.func, attr)
 
 app = Celery('socialminer', broker='amqp://guest@rabbitmq//', backend='redis://redis:6379', 
-	include=['socialminer.twitter_tasks'])
+	include=['twitter_tasks'])
 
 app.conf.update(
     CELERY_TASK_SERIALIZER = "json",

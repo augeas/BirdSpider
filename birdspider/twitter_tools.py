@@ -12,9 +12,9 @@ from py2neo import cypher, neo4j, node, rel
 import redis
 from twython import Twython, TwythonAuthError, TwythonRateLimitError, TwythonError
 
-from socialminer.db_settings import *
-from socialminer.twitter_settings import *
-from socialminer.solr_tools import addSolrDocs
+from db_settings import *
+from twitter_settings import *
+from solr_tools import addSolrDocs
 
 """
 Fields of interest from twitter users and tweets returned by Twython.
