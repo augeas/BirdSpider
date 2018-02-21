@@ -4,7 +4,7 @@ import redis
 
 cache = redis.StrictRedis()
 
-NeoURL = "http://localhost:7474/db/data/"
+NeoURL = "http://neo4j:7474/db/data/"
 neoDb = neo4j.GraphDatabaseService(NeoURL)
 
-solrURL = 'http://localhost:8983/solr/'
+solrURL = 'http://solr:8983/solr/'
