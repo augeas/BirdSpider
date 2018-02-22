@@ -2,7 +2,7 @@
 from py2neo import Graph
 import redis
 
-cache = redis.StrictRedis()
+cache = redis.StrictRedis(host='redis')
 
 neoDb = Graph(host='neo4j', bolt=False)
 

@@ -1,11 +1,27 @@
 
-from twython import Twython, TwythonAuthError, TwythonRateLimitError, TwythonError
+from datetime import datetime
+import json
 
-from db_setting import cache
+from twython import Twython, TwythonAuthError, TwythonRateLimitError, TwythonError
+from twython.endpoints import EndpointsMixin
+
+from db_settings import cache
 from twitter_settings import *
 
-class ratedTwitter(object):
+__twitter_methods__ = filter(lambda m: not m.startswith('__'),dir(EndpointsMixin))
+
+
+class RatedTwitter(object):    
     """Wrapper around the Twython class that tracks whether API calls are rate-limited."""
+
+    def __init__(self,use_local=True):
+        if use_local:
+            self.twitter = Twython(CONSUMER_KEY,CONSUMER_SECRET,OAUTH_TOKEN,OAUTH_TOKEN_SECRET)
+            self.handle = 'local_'
+        else:
+            self.twitter = Twython(CONSUMER_KEY,access_token=ACCESS_TOKEN)
+            self.handle = 'app_'
+            
     def __can_we_do_that__(self,methodName):
         """Check whether a given API call is rate-limited, return the estimated time to wait in seconds.
     
@@ -25,35 +41,38 @@ class ratedTwitter(object):
                 return (reset - rightNow).seconds + 30 # ...return the time to wait.
             return 0
 
-    def __method_call__(self,methodName,args):
+    def __method_call__(self, method_name, *args, **kwargs):
         """Make a Twitter API call via the underlying Twython object.
     
         Returns a tuple: (True,<API call return value>) | (False,<reason for failure>)
     
         Positional arguments:
         methodName -- the name of the API call to test
-        args -- dictionary of keyword arguments
+
         """ 
-        try: # Does Twython even know how to do that?
-            method = getattr(self.twitter,methodName)
+        
+        # Does Twython even know how to do that?
+        try: 
+            method = getattr(self.twitter,method_name)
         except:
-            print '*** NO SUCH TWITTER METHOD: '+methodName+' ***'
+            print '*** NO SUCH TWITTER METHOD: '+method_name+' ***'
             return (False,'no_such_method')
         
+        # Call the method of the Twython object.
         try:
-            result = (True,method(**args)) # Call the method of the Twython object.
+            result = (True,method(*args, **kwargs)) 
         except TwythonAuthError:
-            print '*** TWITTER METHOD 401: '+methodName+' ***'
+            print '*** TWITTER METHOD 401: '+method_name+' ***'
             result = (False,'forbidden')
         except TwythonRateLimitError:
-            print '*** TWITTER METHOD LIMITED: '+methodName+' ***'
+            print '*** TWITTER METHOD LIMITED: '+method_name+' ***'
             result = (False,'limited')
         except TwythonError as e:
             if str(e.error_code) == '404':
-                print '*** TWITTER METHOD 404: '+methodName+' ***'
+                print '*** TWITTER METHOD 404: '+method_name+' ***'
                 result = (False,'404')
             else:
-                print '*** TWITTER METHOD FAILED: '+methodName+' ***'
+                print '*** TWITTER METHOD FAILED: '+method_name+' ***'
                 result = (False,'unknown')
             print args
 
@@ -68,28 +87,24 @@ class ratedTwitter(object):
         if xReset:
             reset = datetime.utcfromtimestamp(int(xReset)).isoformat()
         if xLimit and xReset: # Store the current number of remaining calls and time when the window resets.
-            cache.set(self.handle+methodName,json.dumps({'limit':limit, 'reset':reset})) 
+            cache.set(self.handle+method_name,json.dumps({'limit':limit, 'reset':reset})) 
 
         return result
 
-    def __init__(self,credentials=False,useLocal=False):
-        
-        if not credentials:
-            if useLocal:
-                self.twitter = Twython(CONSUMER_KEY,CONSUMER_SECRET,OAUTH_TOKEN,OAUTH_TOKEN_SECRET)
-                self.handle = 'local_'
-            else:
-                self.twitter = Twython(CONSUMER_KEY,access_token=ACCESS_TOKEN)
-                self.handle = 'app_'
+
                 
 """
 Attach the following API calls to the ratedTwitter class, so that <ratedTwitter>.<method>(**args) makes the call via <ratedTwitter.__method_call__
 and <ratedTwitter>.<method>_limited() makes the appropriate call to __can_we_do_that__.
 """
-for name in ['lookup_user','get_friends_list','get_followers_list','get_user_timeline']:
-    def f(self,name=name,**args): # http://math.andrej.com/2009/04/09/pythons-lambda-is-broken/
-        return self.__method_call__(name,args)
-    setattr(ratedTwitter,name,f)
+
+def method_factory(name):
+    def f(self, *args ,**kwargs):
+        return self.__method_call__(name, *args, **kwargs)
+    return f
+
+for name in __twitter_methods__:
+    setattr(ratedTwitter,name,method_factory(name))
     
     def g(self,name=name):
         return self.__can_we_do_that__(name)
