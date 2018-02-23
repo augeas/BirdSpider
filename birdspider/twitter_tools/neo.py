@@ -18,47 +18,72 @@ def cypherVal(val):
         escval = unicode(re.sub("\n","\\\\n",escval))
         return u"'"+escval+u"'"
 
-def mergeNode(name, label, item, match=False):
-    if match:
-        action = u'MATCH ('
-    else:
-        action = u'MERGE ('
+def nodeRef(name, label, item):
     properties = u' { ' + u', '.join([u': '.join([prop, cypherVal(val)]) for prop, val in item.items()]) + u' }'
-    return action + unicode(name) + u': ' + unicode(label) + properties + u')'
+    return u'(' + unicode('t'+name) + u': ' + unicode(label) + properties + u')'
+
+def mergeNode(*nodes, **kw):
+    if kw.get('match', False):
+        action = u'MATCH '
+    else:
+        action = u'MERGE '
+    return action + u','.join(nodes)
 
 def mergeRel(src, rel, dest):
-    return 'MERGE ({})-[:{}]->({})'.format(src, rel, dest)
+    return 'MERGE ({})-[:{}]->({})'.format('t'+src, rel, 't'+dest)
+
+def setNode(name, properties):
+    tName = 't' + name
+    return u'SET ' + u', '.join([u"{}.{} = {}".format(tName, prop, cypherVal(val))
+        for prop,val in properties.items()])
 
 def pushUsers2Neo(renderedTwits):
     """Store  a list of rendered Twitter users in Neo4J. No relationships are formed."""
     started = datetime.now()
     rightNow = started.isoformat()
+    
     for twit in renderedTwits:
         twit['last_scraped'] = rightNow
-    query = '\n'.join([mergeNode(twit['screen_name'], 'twitter_user', twit) for twit in renderedTwits])
+        
+    nodes = [nodeRef(twit['screen_name'], 'twitter_user', {'screen_name': twit['screen_name']}) for twit in renderedTwits]
+    
+    updates = ['\n'.join([mergeNode(node, match=True), setNode(twit['screen_name'], twit)])
+            for node,twit in zip(nodes, renderedTwits)]
+    
+    query = '\n'.join([mergeNode(twit) for twit in nodes])
     with neoDb.session() as session:
         with session.begin_transaction() as tx:
             tx.run(query)
-                
+        with session.begin_transaction() as tx:
+            for update_query in updates:
+                tx.run(update_query)
+                            
 def pushConnections2Neo(user, renderedTwits, friends=True):
+    """Add friend/follower relationships between an existing user node with screen_name <user> and
+    the rendered Twitter users."""
     started = datetime.now()
     rightNow = started.isoformat()
+        
+    pushUsers2Neo(renderedTwits)
     
     if friends:
         link = lambda target: mergeRel(user, 'FOLLOWS', target)
-        update = "SET {}.friends_last_scraped = '{}'".format(user,rightNow) 
+        update = "SET {}.friends_last_scraped = '{}'".format('t'+user,rightNow) 
     else:
         link = lambda target: mergeRel(target, 'FOLLOWS', user)
-        update = "SET {}.followers_last_scraped = '{}'".format(user,rightNow)
+        update = "SET {}.followers_last_scraped = '{}'".format('t'+user,rightNow)
     
-    query = [mergeNode(user, 'twitter_user', {'screen_name':user}, match=True), update]
+    userNode = nodeRef(user, 'twitter_user', {'screen_name':user})
     
-    for twit in renderedTwits:
-        twit['last_scraped'] = rightNow
-        query.append(mergeNode(twit['screen_name'], 'twitter_user', twit))
-        query.append(link(twit['screen_name']))
+    update_query = '\n'.join([mergeNode(userNode, match=True), update])
     
+    targetNodes = [nodeRef(twit['screen_name'], 'twitter_user', {'screen_name':twit['screen_name']}) for twit in renderedTwits]
+        
     with neoDb.session() as session:
         with session.begin_transaction() as tx:
-            tx.run('\n'.join(query))
+            tx.run(update_query)
+        for node, twit in zip(targetNodes, renderedTwits):
+            with session.begin_transaction() as tx:
+                query = '\n'.join([mergeNode(userNode, node, match=True), link(twit['screen_name'])])
+                tx.run(query)
     
