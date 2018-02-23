@@ -28,96 +28,6 @@ tweetFields = [u'text',u'in_reply_to_status_id',u'id',u'favorite_count',u'source
     u'in_reply_to_screen_name',u'id_str',u'retweet_count',u'in_reply_to_user_id',u'favorited',
     u'in_reply_to_user_id_str',u'possibly_sensitive',u'lang',u'created_at',u'in_reply_to_status_id_str'] + [u'isotime',u'last_scraped',u'__temp_label__']
 
-class ratedTwitter(object):
-    """Wrapper around the Twython class that tracks whether API calls are rate-limited."""
-    def __can_we_do_that__(self,methodName):
-        """Check whether a given API call is rate-limited, return the estimated time to wait in seconds.
-    
-        Positional arguments:
-        methodName -- the name of the API call to test    
-        """      
-        keyval = cache.get(self.handle+methodName) # Have we recorded how many calls remain in the current window?
-        if not keyval: # We've not made the call for these credentials. Assume all's well.
-            return 0
-        else:
-            history = json.loads(keyval)
-            if history['limit'] > 0: # Still good to go.
-                return 0
-            reset = datetime.strptime( history['reset'].split('.')[0], "%Y-%m-%dT%H:%M:%S" )
-            rightNow = datetime.now()
-            if reset > rightNow: # No calls left and the window reset is in the future...
-                return (reset - rightNow).seconds + 30 # ...return the time to wait.
-            return 0
-
-    def __method_call__(self,methodName,args):
-        """Make a Twitter API call via the underlying Twython object.
-    
-        Returns a tuple: (True,<API call return value>) | (False,<reason for failure>)
-    
-        Positional arguments:
-        methodName -- the name of the API call to test
-        args -- dictionary of keyword arguments
-        """ 
-        try: # Does Twython even know how to do that?
-            method = getattr(self.twitter,methodName)
-        except:
-            print '*** NO SUCH TWITTER METHOD: '+methodName+' ***'
-            return (False,'no_such_method')
-        
-        try:
-            result = (True,method(**args)) # Call the method of the Twython object.
-        except TwythonAuthError:
-            print '*** TWITTER METHOD 401: '+methodName+' ***'
-            result = (False,'forbidden')
-        except TwythonRateLimitError:
-            print '*** TWITTER METHOD LIMITED: '+methodName+' ***'
-            result = (False,'limited')
-        except TwythonError as e:
-            if str(e.error_code) == '404':
-                print '*** TWITTER METHOD 404: '+methodName+' ***'
-                result = (False,'404')
-            else:
-                print '*** TWITTER METHOD FAILED: '+methodName+' ***'
-                result = (False,'unknown')
-            print args
-
-        try: # Have we been told how many calls remain in the current window?
-            xLimit = self.twitter.get_lastfunction_header('x-rate-limit-remaining')
-            xReset = self.twitter.get_lastfunction_header('x-rate-limit-reset')
-        except:
-            xLimit = xReset = False
-            
-        if xLimit:
-            limit = int(xLimit)        
-        if xReset:
-            reset = datetime.utcfromtimestamp(int(xReset)).isoformat()
-        if xLimit and xReset: # Store the current number of remaining calls and time when the window resets.
-            cache.set(self.handle+methodName,json.dumps({'limit':limit, 'reset':reset})) 
-
-        return result
-
-    def __init__(self,credentials=False,useLocal=False):
-        
-        if not credentials:
-            if useLocal:
-                self.twitter = Twython(CONSUMER_KEY,CONSUMER_SECRET,OAUTH_TOKEN,OAUTH_TOKEN_SECRET)
-                self.handle = 'local_'
-            else:
-                self.twitter = Twython(CONSUMER_KEY,access_token=ACCESS_TOKEN)
-                self.handle = 'app_'
-                
-"""
-Attach the following API calls to the ratedTwitter class, so that <ratedTwitter>.<method>(**args) makes the call via <ratedTwitter.__method_call__
-and <ratedTwitter>.<method>_limited() makes the appropriate call to __can_we_do_that__.
-"""
-for name in ['lookup_user','get_friends_list','get_followers_list','get_user_timeline']:
-    def f(self,name=name,**args): # http://math.andrej.com/2009/04/09/pythons-lambda-is-broken/
-        return self.__method_call__(name,args)
-    setattr(ratedTwitter,name,f)
-    
-    def g(self,name=name):
-        return self.__can_we_do_that__(name)
-    setattr(ratedTwitter,name+'_limited',g)    
     
         
 def getTwitterAPI(credentials=False):
@@ -126,28 +36,6 @@ def getTwitterAPI(credentials=False):
         return Twython(CONSUMER_KEY,access_token=ACCESS_TOKEN)
 
     
-noSlash = q=re.compile(r'\\')
-
-def cypherVal(val):
-    """Escape quotes and slashes for use in Cypher queries."""    
-    if isinstance(val, (int, long, bool)):
-        return unicode(val)
-    else:
-        escval = re.sub(noSlash,r'\\\\',val) # Escape all the backslashes.
-        if "'" in escval:
-            return u"'"+unicode(re.sub("'","\\'",escval))+"'"
-        else:
-            return u"'"+unicode(escval)+"'"
-
-# Return Twitter's time format as isoformat.
-twitterTime = lambda d: datetime.strptime(re.sub('[+\-][0-9]{4}\s','',d),'%a %b %d %X %Y').isoformat()
-
-def renderTwitterUser(user):
-    """Return a serializable dictionary of relevant fields for a Twitter user."""
-    twit = dict([ (field,user[field]) for field in  twitterUserFields if user.get(field,False) ]) # Strip out the stuff we don't want to store.
-    if user.get('created_at',False): # Suplement Twitter's time field with something saner.
-        twit['isotime'] = twitterTime(user['created_at'])    
-    return twit
 
 def setUserDefunct(user):
     try:
@@ -156,14 +44,7 @@ def setUserDefunct(user):
         return  
     userNode.update_properties({'defunct':'true'})
 
-def pushUsers2Neo(renderedTwits):
-    """Store  a list of rendered Twitter users in Neo4J. No relationships are formed."""
-    for twit in renderedTwits:
-        twitNode = userIndex.get_or_create('id_str', twit['id_str'],twit)
-        try:
-            twitNode.add_labels('twitter_user')
-        except:
-            pass
+
                 
 def renderTweet(tweet):
     """Return a serializable dictionary of relevant fields for a tweet."""
@@ -414,57 +295,6 @@ def uniqueNeoRelation(a,b,rel):
     return u'CREATE UNIQUE ('+a+u')-[:`'+rel+u'`]->('+b+u')'
 
                 
-def pushConnections2Neo(user, renderedTwits, friends=True):
-
-    started = datetime.now()
-    rightNow = started.isoformat()
-
-    try:
-        userNode = neoDb.find('twitter_user', property_key='screen_name', property_value=user).next()
-    except:
-        return
-
-    batch = neo4j.WriteBatch(neoDb)
-
-    if friends:
-        job = ' FRIENDS'
-        userNode.update_properties({'friends_last_scraped':rightNow})
-        connlabel = lambda a: user+' befriended '+a['screen_name']
-        link = lambda n: batch.get_or_create_indexed_relationship(friendIndex,'friends',connlabel(twit),userNode,'FOLLOWS',n)
-        
-    else:
-        job = ' FOLLOWERS'
-        userNode.update_properties({'followers_last_scraped':rightNow})
-        connlabel = lambda a: a['screen_name']+' befriended '+user
-        link = lambda n: batch.get_or_create_indexed_relationship(friendIndex,'friends',connlabel(twit),n,'FOLLOWS',userNode)
-
-    for twit in renderedTwits:
-        twit['last_scraped'] = rightNow
-        twit['__temp_label__'] = 'twitter_user'
-        
-        link(batch.get_or_create_in_index(neo4j.Node, userIndex, 'id_str', twit['id_str'], abstract = twit))
-
-    batchDone = False
-    while not batchDone:
-        try:
-            batch.submit()
-            batchDone = True
-        except:
-            print "*** NEO: CAN'T SUBMIT BATCH. RETRYING ***"
-           
-
-    fixedLabels = False
-    while not fixedLabels:
-        try:
-            query = neo4j.CypherQuery(neoDb,'MATCH (n {__temp_label__:"twitter_user"}) WITH n SET n:twitter_user REMOVE n.__temp_label__')
-            query.execute()
-            fixedLabels = True
-        except:
-            print "*** NEO: CAN'T SET LABELS. RETRYING ***"
- 
-            
-    howLong = (datetime.now() - started).seconds
-    print '*** '+user+': PUSHED '+str(len(renderedTwits))+job+' TO NEO IN '+str(howLong)+'s ***'
         
 
 def nextFriends(latest=False):
