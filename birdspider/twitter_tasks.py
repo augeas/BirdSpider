@@ -12,10 +12,10 @@ from celery import chain, group
 from app import app
 from db_settings import cache
 from twitter_settings import *
-from twitter_tools import *
+from twitter_tools.rated_twitter import RatedTwitter
 
 @app.task
-def twitterCall(methodName,args,credentials=False):
+def twitterCall(method_name, **kwargs):
     """Attempt a given Twitter API call, retry if rate-limited. Returns the result of the call.
     
         Positional arguments:
@@ -23,15 +23,15 @@ def twitterCall(methodName,args,credentials=False):
         args -- a dicionary of keyword arguments
         
     """
-    api = ratedTwitter(credentials=credentials)
-    limit = api.__can_we_do_that__(methodName)
+    api = RatedTwitter()
+    limit = api.can_we_do_that(method_name)
     if limit:
-        print '*** TWITTER RATE-LIMITED: '+methodName+' ***'
-        raise twitterCall.retry(exc=Exception('Twitter rate-limited',methodName), countdown = limit)
+        print '*** TWITTER RATE-LIMITED: '+method_name+' ***'
+        raise twitterCall.retry(exc=Exception('Twitter rate-limited',method_name), countdown = limit)
     else:
-        okay, result = api.__method_call__(methodName,args)
+        okay, result = api.method_call(method_name, **kwargs)
         if okay:
-            print '*** TWITTER CALL: '+methodName+' ***' 
+            print '*** TWITTER CALL: '+method_name+' ***' 
             return result
         else:
             assert False

@@ -1,7 +1,7 @@
 celery
+neo4j-driver
 networkx
 numpy
-py2neo
 redis
 requests
 twython
