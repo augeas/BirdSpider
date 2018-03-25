@@ -79,4 +79,13 @@ def pushConnections2Neo(user, renderedTwits, friends=True):
         with session.begin_transaction() as tx:
             tx.run(update_query)
             tx.run(query, data=data)
-        
+
+def tweets2Neo(user,tweetDump):
+    """Store a rendered set of tweets by a given user in Neo4J.
+       
+    Positional arguments:
+    user -- screen_name of the author of the tweets
+    tweetDump -- tweets, retweets, mentions, hastags, URLs and replies from "decomposeTweets"
+
+    """
+    
