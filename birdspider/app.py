@@ -37,7 +37,7 @@ from celery import Celery
 #    def __getattr__(self, attr):
 #        return getattr(self.func, attr)
 
-app = Celery('socialminer', broker='amqp://guest@rabbitmq//', backend='redis://redis:6379', 
+app = Celery('birdspider', broker='amqp://guest@rabbitmq//', backend='redis://redis:6379',
 	include=['twitter_tasks'])
 
 app.conf.update(
