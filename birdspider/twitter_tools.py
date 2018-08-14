@@ -26,9 +26,9 @@ u'screen_name', u'lang',u'favourites_count',u'name', u'url', u'created_at', u'ti
 
 tweetFields = [u'text',u'in_reply_to_status_id',u'id',u'favorite_count',u'source',u'retweeted',
     u'in_reply_to_screen_name',u'id_str',u'retweet_count',u'in_reply_to_user_id',u'favorited',
-    u'in_reply_to_user_id_str',u'possibly_sensitive',u'lang',u'created_at',u'in_reply_to_status_id_str'] + [u'isotime',u'last_scraped',u'__temp_label__']
+    u'in_reply_to_user_id_str',u'possibly_sensitive',u'lang',u'created_at',u'in_reply_to_status_id_str'] +  [u'isotime',u'last_scraped',u'__temp_label__']
 
-    
+   
         
 def getTwitterAPI(credentials=False):
     """Return a Twitter API object from oauth credentials, defaulting to those in db_settings."""

@@ -54,13 +54,27 @@ def pushEntities(tweet, entity_store):
         for item in extended['media']:
             entity_store['media'].append((tweet_id, item))
 
+def entityStore():
+    ents = {key:[] for key in entity_types}
+    ents['media'] = []
+
+def replies(tweets):
+    for t in tweets:
+        reply_id = t.get('in_reply_to_status_id',False)
+        if reply_id:
+            yield (t['id'],reply_id)
+
+def cleanMentions(entities):
+    for m in entities['user_mentions']:
+        m[1].pop('indices')
+
 def decomposeTweets(tweets):
     """Decompose a list of tweets returned by Twython into lists of rendered tweets, retweets, mentions, hastags, URLs and replies."""
     allTweets = []
     allRetweets = []
     allQuoteTweets = []
-    allEntities = {key:[] for key in entity_types}
-    allEntities['media'] = []
+    
+    allEntities = {key:entityStore() for key in ['tweet', 'retweet', 'quotetweet']}
     
     for tweet in tweets:
         
@@ -72,20 +86,28 @@ def decomposeTweets(tweets):
             renderedTweet = renderTweet(raw)
             renderedRetweet = renderTweet(tweet)
             allRetweets.append((renderedTweet,renderedRetweet))
-            pushEntities(raw, allEntities)
+            pushEntities(raw, allEntities['retweet'])
         
         if quoted_status and not retweeted:
             raw = quoted_status
             renderedTweet = renderTweet(raw)
-            renderedQuoteTweet = renderTweet(tweet)
+            renderedQuoteTweet = r
             allQuoteTweets.append((renderedTweet,renderedQuoteTweet))
-            pushEntities(raw, allEntities)
+            pushEntities(raw, allEntities['quotetweet'])
         
         if not retweeted and not quoted_status:
             renderedTweet = renderTweet(tweet)
-            allTweets.append(renderedTweet)
-            pushEntities(tweet, allEntities)
+            allTweets.append((renderedTweet,))
+            pushEntities(tweet, allEntities['tweet'])
+
+    allReplies = {}
+    allReplies['tweet'] = list(replies(allTweets))
+    allReplies['retweet'] = list(replies(allRetweets))
+    allReplies['quotetweet'] = list(replies(allQuoteTweets))
+
+    cleanMentions(allEntities['tweet'])
+    cleanMentions(allEntities['retweet'])
+    cleanMentions(allEntities['quotetweet'])
+    
+    return {'tweet':allTweets, 'retweet':allRetweets, 'quotetweet':allQuoteTweets,'entities':allEntities, 'replies':allReplies}
             
-    return {'tweets':allTweets, 'retweets':allRetweets, 'entities':allEntities}
-            
-        
