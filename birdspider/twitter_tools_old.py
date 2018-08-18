@@ -1,4 +1,4 @@
-from __future__ import absolute_import
+
 # Licensed under the Apache License Version 2.0: http://www.apache.org/licenses/LICENSE-2.0.txt
 
 __author__ = 'Giles Richard Greenway'
@@ -20,13 +20,13 @@ from solr_tools import addSolrDocs
 Fields of interest from twitter users and tweets returned by Twython.
 Extra fields provided by the various render methods are appended.
 """
-twitterUserFields = [u'id', u'id_str', u'verified', u'profile_image_url_https', u'followers_count', u'listed_count',
-u'utc_offset',u'statuses_count', u'description', u'friends_count', u'location', u'profile_image_url', u'geo_enabled',
-u'screen_name', u'lang',u'favourites_count',u'name', u'url', u'created_at', u'time_zone', u'protected'] + [u'isotime',u'last_scraped',u'__temp_label__']
+twitterUserFields = ['id', 'id_str', 'verified', 'profile_image_url_https', 'followers_count', 'listed_count',
+'utc_offset','statuses_count', 'description', 'friends_count', 'location', 'profile_image_url', 'geo_enabled',
+'screen_name', 'lang','favourites_count','name', 'url', 'created_at', 'time_zone', 'protected'] + ['isotime','last_scraped','__temp_label__']
 
-tweetFields = [u'text',u'in_reply_to_status_id',u'id',u'favorite_count',u'source',u'retweeted',
-    u'in_reply_to_screen_name',u'id_str',u'retweet_count',u'in_reply_to_user_id',u'favorited',
-    u'in_reply_to_user_id_str',u'possibly_sensitive',u'lang',u'created_at',u'in_reply_to_status_id_str'] +  [u'isotime',u'last_scraped',u'__temp_label__']
+tweetFields = ['text','in_reply_to_status_id','id','favorite_count','source','retweeted',
+    'in_reply_to_screen_name','id_str','retweet_count','in_reply_to_user_id','favorited',
+    'in_reply_to_user_id_str','possibly_sensitive','lang','created_at','in_reply_to_status_id_str'] +  ['isotime','last_scraped','__temp_label__']
 
    
         
@@ -39,7 +39,7 @@ def getTwitterAPI(credentials=False):
 
 def setUserDefunct(user):
     try:
-        userNode=neoDb.find('twitter_user', property_key='screen_name', property_value=user).next()
+        userNode=next(neoDb.find('twitter_user', property_key='screen_name', property_value=user))
     except:
         return  
     userNode.update_properties({'defunct':'true'})
@@ -119,7 +119,7 @@ def tweets2Solr(tweets):
     started = datetime.now()
     addSolrDocs([ {'doc_type':'tweet', 'id':tw['id_str'], 'tweet_text':tw['text'],  'tweet_time':tw['isotime']+'Z'} for tw in tweets ])
     howLong = (datetime.now() - started).seconds
-    print '*** PUSHED '+str(len(tweets))+' TWEETS TO SOLR IN '+str(howLong)+'s ***'    
+    print('*** PUSHED '+str(len(tweets))+' TWEETS TO SOLR IN '+str(howLong)+'s ***')    
     
 def tweets2Neo(user,tweetDump):
     """Store a rendered set of tweets by a given user in Neo4J.
@@ -134,7 +134,7 @@ def tweets2Neo(user,tweetDump):
     rightNow = started.isoformat()
 
     try: # Check that a twitter user with the given screen_name exists within Neo4J.
-        userNode=neoDb.find('twitter_user', property_key='screen_name', property_value=user).next()
+        userNode=next(neoDb.find('twitter_user', property_key='screen_name', property_value=user))
         userNode.update_properties({'tweets_last_scraped':rightNow})
     except:
         return
@@ -268,7 +268,7 @@ def tweets2Neo(user,tweetDump):
             batch.submit()
             batchDone = True
         except:
-            print "*** CAN'T SUBMIT BATCH. RETRYING ***"
+            print("*** CAN'T SUBMIT BATCH. RETRYING ***")
  
     # Adding labels to indexed nodes is broken, hence the __temp_label__ field.
     # See the small footnote here: http://stackoverflow.com/questions/20010509/failed-writebatch-operation-with-py2neo
@@ -286,13 +286,13 @@ def tweets2Neo(user,tweetDump):
                 query.execute()
                 fixedLabels = True
             except:
-                print "*** CAN'T SET LABELS. RETRYING ***" 
+                print("*** CAN'T SET LABELS. RETRYING ***") 
 
     howLong = (datetime.now() - started).seconds
-    print '*** '+user+': PUSHED '+str(len(tweetDump['tweets']))+' TWEETS TO NEO IN '+str(howLong)+'s ***'
+    print('*** '+user+': PUSHED '+str(len(tweetDump['tweets']))+' TWEETS TO NEO IN '+str(howLong)+'s ***')
 
 def uniqueNeoRelation(a,b,rel):
-    return u'CREATE UNIQUE ('+a+u')-[:`'+rel+u'`]->('+b+u')'
+    return 'CREATE UNIQUE ('+a+')-[:`'+rel+'`]->('+b+')'
 
                 
         
@@ -358,7 +358,7 @@ def nextNearest(user,job,test=False):
         except:
             nextUsers = []
     if nextUsers:
-        print '*** NEXT '+job+': '+', '.join(nextUsers)+' ***'
+        print('*** NEXT '+job+': '+', '.join(nextUsers)+' ***')
         nextUser = nextUsers.pop(0)
         cache.set(cacheKey,json.dumps(nextUsers))
         return nextUser
@@ -381,7 +381,7 @@ def nextNearest(user,job,test=False):
         queryStr += 'AND b.statuses_count > 0 AND n < b.statuses_count/2 AND n<1000 '
     queryStr += 'RETURN b.screen_name ORDER BY b.'+job+'_last_scraped LIMIT 20'
 
-    print '*** Looking for '+job+' ***'
+    print('*** Looking for '+job+' ***')
  
     if test:
         return queryStr
@@ -393,11 +393,11 @@ def nextNearest(user,job,test=False):
         nextUsers = []
     
     if nextUsers:
-        print '*** NEXT '+job+': '+', '.join(nextUsers)+' ***'
+        print('*** NEXT '+job+': '+', '.join(nextUsers)+' ***')
         nextUser = nextUsers.pop(0)
         cache.set(cacheKey,json.dumps(nextUsers))
         return nextUser
     else:
-        print 'No more '+job+' for '+user
+        print('No more '+job+' for '+user)
     
     return False

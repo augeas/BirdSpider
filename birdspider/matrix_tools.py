@@ -1,4 +1,4 @@
-from __future__ import absolute_import
+
 # Licensed under the Apache License Version 2.0: http://www.apache.org/licenses/LICENSE-2.0.txt
 
 
@@ -37,9 +37,9 @@ def clusterize(matrix,inflate=1.5):
         else:
             output += ' Converged in '+str((datetime.now()-start).seconds)+ ' seconds.'
             converged = True
-        print output
+        print(output)
  
-    labs = np.array(range(dim))
+    labs = np.array(list(range(dim)))
   
     clusterLists = [ list(j) for j in [ labs[newMat[i] > __vsmall__ ] for i in range(dim) ] if j.shape[0] > 2]
 
@@ -84,7 +84,7 @@ def buildgraph(matrix,labels=False,clusters={},clustermode=False):
     dim = len(matrix)
     
     if not labels:
-        G.add_nodes_from(range(dim))
+        G.add_nodes_from(list(range(dim)))
     else:
         for i,lab in enumerate(labels):
             G.add_node(i, label=lab)

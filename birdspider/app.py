@@ -1,5 +1,5 @@
 #!/usr/bin/python
-from __future__ import absolute_import
+
 # Licensed under the Apache License Version 2.0: http://www.apache.org/licenses/LICENSE-2.0.txt
 
 from celery import Celery

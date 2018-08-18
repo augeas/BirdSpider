@@ -2,6 +2,7 @@
 import json
 import requests
 
+from datetime import datetime
 from db_settings import solrURL
 
 solrFields = {
@@ -13,15 +14,23 @@ solrFields = {
 #solrDateFields = [ field if solrFields[field]['type'] == 'date' for field in solrFields.keys() ]
 
 def addSolrFields():
-    for fieldName in solrFields.keys():
+    for fieldName in list(solrFields.keys()):
         resp = requests.put(solrURL+'schema/fields/'+fieldName,json.dumps(solrFields[fieldName]))
         if resp.status_code == 200:
-            print 'Added field: '+fieldName
+            print('Added field: '+fieldName)
         else:
-            print "Couldn't add field: '"+fieldName
-            
+            print("Couldn't add field: '"+fieldName)
+
+
 def addSolrDocs(docs):
     resp = requests.post(solrURL+'update/json?commit=true',data=json.dumps(docs),headers = {'content-type': 'application/json'})
-    if resp.status_code <> 200:
-        print "*** Can't push Solr docs... ***"
+    if resp.status_code != 200:
+        print("*** Can't push Solr docs... ***")
+
+
+def tweets2Solr(tweets):
+    started = datetime.now()
+    addSolrDocs([ {'doc_type':'tweet', 'id':tw['id_str'], 'tweet_text':tw['text'],  'tweet_time':tw['isotime']+'Z'} for tw in tweets ])
+    howLong = (datetime.now() - started).seconds
+    print('*** PUSHED '+str(len(tweets))+' TWEETS TO SOLR IN '+str(howLong)+'s ***')
 

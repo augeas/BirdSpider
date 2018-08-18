@@ -8,7 +8,7 @@ from twython.endpoints import EndpointsMixin
 from db_settings import cache
 from twitter_settings import *
 
-__twitter_methods__ = filter(lambda m: not m.startswith('__'),dir(EndpointsMixin))
+__twitter_methods__ = [m for m in dir(EndpointsMixin) if not m.startswith('__')]
 
 class RatedTwitter(object):    
     """Wrapper around the Twython class that tracks whether API calls are rate-limited."""
@@ -60,26 +60,26 @@ class RatedTwitter(object):
         try: 
             method = getattr(self.twitter,method_name)
         except:
-            print '*** NO SUCH TWITTER METHOD: '+method_name+' ***'
+            print('*** NO SUCH TWITTER METHOD: '+method_name+' ***')
             return (False,'no_such_method')
         
         # Call the method of the Twython object.
         try:
             result = (True,method(*args, **kwargs)) 
         except TwythonAuthError:
-            print '*** TWITTER METHOD 401: '+method_name+' ***'
+            print('*** TWITTER METHOD 401: '+method_name+' ***')
             result = (False,'forbidden')
         except TwythonRateLimitError:
-            print '*** TWITTER METHOD LIMITED: '+method_name+' ***'
+            print('*** TWITTER METHOD LIMITED: '+method_name+' ***')
             result = (False,'limited')
         except TwythonError as e:
             if str(e.error_code) == '404':
-                print '*** TWITTER METHOD 404: '+method_name+' ***'
+                print('*** TWITTER METHOD 404: '+method_name+' ***')
                 result = (False,'404')
             else:
-                print '*** TWITTER METHOD FAILED: '+method_name+' ***'
+                print('*** TWITTER METHOD FAILED: '+method_name+' ***')
                 result = (False,'unknown')
-            print args
+            print(args)
 
         # Have we been told how many calls remain in the current window?
         try: 

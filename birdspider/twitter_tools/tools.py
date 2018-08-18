@@ -6,14 +6,14 @@ import re
 Fields of interest from twitter users and tweets returned by Twython.
 Extra fields provided by the various render methods are appended.
 """
-twitterUserFields = [u'id', u'id_str', u'verified', u'profile_image_url_https', u'followers_count', u'listed_count',
-u'utc_offset',u'statuses_count', u'description', u'friends_count', u'location', u'profile_image_url', u'geo_enabled',
-u'screen_name', u'lang',u'favourites_count',u'name', u'url', u'created_at', u'time_zone', u'protected'] + [u'isotime', u'last_scraped']
+twitterUserFields = ['id', 'id_str', 'verified', 'profile_image_url_https', 'followers_count', 'listed_count',
+'utc_offset','statuses_count', 'description', 'friends_count', 'location', 'profile_image_url', 'geo_enabled',
+'screen_name', 'lang','favourites_count','name', 'url', 'created_at', 'time_zone', 'protected'] + ['isotime', 'last_scraped']
 
-tweetFields = [u'text', u'in_reply_to_status_id', u'id', u'favorite_count', u'source',u'retweeted',
-    u'in_reply_to_screen_name', u'id_str', u'retweet_count', u'in_reply_to_user_id', u'favorited',
-    u'in_reply_to_user_id_str', u'possibly_sensitive', u'lang',u'created_at', u'in_reply_to_status_id_str',
-    u'quoted_status_id'] + [u'isotime', u'last_scraped']
+tweetFields = ['text', 'in_reply_to_status_id', 'id', 'favorite_count', 'source','retweeted',
+    'in_reply_to_screen_name', 'id_str', 'retweet_count', 'in_reply_to_user_id', 'favorited',
+    'in_reply_to_user_id_str', 'possibly_sensitive', 'lang','created_at', 'in_reply_to_status_id_str',
+    'quoted_status_id'] + ['isotime', 'last_scraped']
 
 def twitterTime(t):
     """Return Twitter's time format as isoformat."""
