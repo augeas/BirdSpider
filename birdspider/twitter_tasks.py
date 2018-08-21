@@ -67,7 +67,7 @@ def getTwitterUsers(users,credentials=False):
     
     """
     userList = ','.join(users)
-    chain(twitterCall.s('lookup_user',{'screen_name':userList},credentials), pushTwitterUsers.s())()
+    chain(twitterCall.s('lookup_user',**{'screen_name':userList}), pushTwitterUsers.s())()
 
 @app.task
 def pushRenderedTweets2Neo(user,tweetDump):
@@ -179,8 +179,8 @@ def pushTwitterConnections(twits,user,friends=True,cacheKey=False):
 # These are the last Tweets, tell the scaper we're done.
     if cacheKey: # These are the last connections, tell the scaper we're done.
         cache.set(cacheKey,'done')
-        print('*** '+user+': DONE WITH'+job+' ***') 
-                   
+        print('*** '+user+': DONE WITH'+job+' ***')
+
 @app.task
 def getTwitterConnections(user,friends=True,cursor = -1,credentials=False,cacheKey=False):
     """Get the connections of the given user, push them to Neo4J.

@@ -71,7 +71,7 @@ def connections2Neo(user, renderedTwits, friends=True):
         merge = "MERGE (t)-[:FOLLOWS]->(f)"
         update = "SET {}.friends_last_scraped = '{}'".format('t'+user,rightNow)
     else:
-
+        merge = "MERGE (t)<-[:FOLLOWS]-(f)"
         update = "SET {}.followers_last_scraped = '{}'".format('t'+user,rightNow)
             
     query = '\n'.join(['UNWIND {data} AS d', match, merge])
