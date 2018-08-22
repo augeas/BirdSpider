@@ -10,6 +10,7 @@ import numpy as np
 __vsmall__ = 0.0001
 __nearly1__ = 0.95
 
+
 def clusterize(matrix,inflate=1.5):
     """Cluster an adjacency matrix by MCL: http://www.micans.org/mcl/"""
     start = datetime.now()
@@ -41,7 +42,7 @@ def clusterize(matrix,inflate=1.5):
  
     labs = np.array(list(range(dim)))
   
-    clusterLists = [ list(j) for j in [ labs[newMat[i] > __vsmall__ ] for i in range(dim) ] if j.shape[0] > 2]
+    clusterLists = [list(j) for j in [labs[newMat[i] > __vsmall__] for i in range(dim)] if j.shape[0] > 2]
 
     clusterRef = {}
     for i, clust in enumerate(clusterLists):
@@ -51,7 +52,8 @@ def clusterize(matrix,inflate=1.5):
             
     return clusterLists, clusterRef
 
-def labelClusters(clusters,labs):
+
+def labelClusters(clusters, labs):
     uniqueClusters = []
     clusterSets = {}
     for c in clusters:
@@ -71,7 +73,7 @@ def labelClusters(clusters,labs):
             uniqueClusters.append(c)
             clusterSets[size] = [thisSet]
              
-    return [ [ labs[i] for i in c ] for c in uniqueClusters if len(c) > 3 ]
+    return [[ labs[i] for i in c] for c in uniqueClusters if len(c) > 3]
         
 def buildgraph(matrix,labels=False,clusters={},clustermode=False):
     
