@@ -57,12 +57,13 @@ def pushEntities(tweet, entity_store):
 def entityStore():
     ents = {key:[] for key in entity_types}
     ents['media'] = []
+    return ents
 
 def replies(tweets):
     for t in tweets:
-        reply_id = t.get('in_reply_to_status_id',False)
+        reply_id = t[0].get('in_reply_to_status_id',False)
         if reply_id:
-            yield (t['id'],reply_id)
+            yield (t[0]['id'],reply_id)
 
 def cleanMentions(entities):
     for m in entities['user_mentions']:
@@ -91,7 +92,7 @@ def decomposeTweets(tweets):
         if quoted_status and not retweeted:
             raw = quoted_status
             renderedTweet = renderTweet(raw)
-            renderedQuoteTweet = r
+            renderedQuoteTweet = renderTweet(tweet)
             allQuoteTweets.append((renderedTweet,renderedQuoteTweet))
             pushEntities(raw, allEntities['quotetweet'])
         
