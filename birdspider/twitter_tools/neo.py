@@ -159,7 +159,8 @@ def setUserDefunct(user):
         return
     userNode.update_properties({'defunct': 'true'})
 
-# TODO: approximately right, not yet tested in any way nor sanity checked one last time before testing
+
+#[['picopony', 'Dino_Pony', 'SilkyRaven', 'hartclaudia1'],['squirmelia','crispjodi','kingseesar','augeas','victoria_dft','matthewchilton']]
 # design of neo graph nodes and relationships for clusters
 # node of label type clustering
 # when done
@@ -175,7 +176,7 @@ def user_clusters_to_neo(labelled_clusters, seed_user, adjacency_criteria):
     # cluster<-member_of-clustering
     # cluster has one property, size
     cluster_match = ("MATCH (a:Clustering) WHERE ID(a) = {}").format(clustering_id)
-    create = " CREATE (b:Cluster {size: $size})<-[:CLUSTERED_BY]-(a) RETURN id(b)"
+    create = " CREATE (b:Cluster {size: $size})-[:CLUSTERED_BY]->(a) RETURN id(b)"
     clustered_by_query = ' '.join([cluster_match, create])
     for cluster in labelled_clusters:
         with neoDb.session() as session:
@@ -192,9 +193,7 @@ def user_clusters_to_neo(labelled_clusters, seed_user, adjacency_criteria):
             with session.begin_transaction() as tx:
                 tx.run(relation_query, data=cluster)
 
-#[['picopony', 'Dino_Pony', 'SilkyRaven', 'hartclaudia1'],['squirmelia','crispjodi','kingseesar','augeas','victoria_dft','matthewchilton']]
 
-# TODO: approximately right, not yet tested in any way nor sanity checked one last time before testing
 def clustering_to_neo(seed, seed_type, seed_id_label, adjacency_criteria):
     started = datetime.now()
     rightNow = started.isoformat()
