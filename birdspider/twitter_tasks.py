@@ -13,9 +13,11 @@ from app import app
 from db_settings import cache
 from solr_tools import tweets2Solr
 from twitter_settings import *
-from twitter_tools.neo import  connections2Neo, tweets2Neo, users2Neo, setUserDefunct
+from twitter_tools.neo import  connections2Neo, tweetDump2Neo, users2Neo, setUserDefunct, user_clusters_to_neo
 from twitter_tools.rated_twitter import RatedTwitter
-from twitter_tools.tools import renderTwitterUser
+from twitter_tools.tools import renderTwitterUser, decomposeTweets
+from twitter_matrices import twitterMatrix, twitterTransFofQuery, twitterFofQuery
+from matrix_tools import clusterize, labelClusters
 
 
 @app.task
@@ -69,16 +71,17 @@ def getTwitterUsers(users,credentials=False):
     userList = ','.join(users)
     chain(twitterCall.s('lookup_user',**{'screen_name':userList}), pushTwitterUsers.s())()
 
+#TODO: finish fixing this it was WRONG tweets2Neo expects tweetDump as first argument, label as second!!! qustion is 'user' desired label? dfault is 'tweets'
 @app.task
-def pushRenderedTweets2Neo(user,tweetDump):
-    tweets2Neo(user,tweetDump)
+def pushRenderedTweets2Neo(user, tweetDump):
+    tweetDump2Neo(user, tweetDump)
     
 @app.task
 def pushRenderedTweets2Solr(tweets):
     tweets2Solr(tweets)
 
 @app.task
-def pushTweets(tweets,user,cacheKey=False):
+def pushTweets(tweets, user, cacheKey=False):
     """ Dump a set of tweets from a given user's timeline to Neo4J/Solr.
 
     Positional arguments:
@@ -90,10 +93,10 @@ def pushTweets(tweets,user,cacheKey=False):
     
     """
     
-    tweetDump = filterTweets(tweets) # Extract mentions, URLs, replies hashtags etc...
+    tweetDump = decomposeTweets(tweets) # Extract mentions, URLs, replies hashtags etc...
 
-    pushRenderedTweets2Neo.delay(user,tweetDump) 
-    pushRenderedTweets2Solr.delay(tweetDump['tweets']+tweetDump['retweets'])
+    pushRenderedTweets2Neo.delay(user, tweetDump)
+    pushRenderedTweets2Solr.delay(tweetDump['tweet']+tweetDump['retweet'])
 
     if cacheKey: # These are the last Tweets, tell the scaper we're done.
         cache.set(cacheKey,'done')
@@ -102,7 +105,7 @@ def pushTweets(tweets,user,cacheKey=False):
     #return True
 
 @app.task
-def getTweets(user,maxTweets=3000,count=0,tweetId=0,cacheKey=False,credentials=False):
+def getTweets(user, maxTweets=3000, count=0, tweetId=0, cacheKey=False, credentials=False):
     """Get tweets from the timeline of the given user, push them to Neo4J.
     
     Positional arguments:
@@ -116,10 +119,10 @@ def getTweets(user,maxTweets=3000,count=0,tweetId=0,cacheKey=False,credentials=F
     
     """
     api = RatedTwitter()
-    limit = api.get_user_timeline_limited()
+    limit = api.get_user_timeline_wait()
     if limit:
         print('*** TWITTER RATE-LIMITED: statuses.user_timeline:'+user+':'+str(count)+' ***')
-        raise getTweets.retry(countdown = limit)
+        raise getTweets.retry(countdown=limit)
     else:
         args = {'screen_name':user,'exclude_replies':False,'include_rts':True,'trim_user':False,'count':200}
         if tweetId:
@@ -133,22 +136,22 @@ def getTweets(user,maxTweets=3000,count=0,tweetId=0,cacheKey=False,credentials=F
                 newCount = count + len(result)
                 if maxTweets:
                     if newCount > maxTweets: # No need for the task to call itself again.
-                        pushTweets.delay(result,user,cacheKey=cacheKey) # Give pushTweets the cache-key to end the job.
+                        pushTweets.delay(result, user, cacheKey=cacheKey) # Give pushTweets the cache-key to end the job.
                         return
                     else:
-                        pushTweets.delay(result,user)
+                        pushTweets.delay(result, user)
 
                 newTweetId = min([t['id'] for t in result]) - 1 
                 # Not done yet, the task calls itself with an updated count and tweetId.
-                getTweets.delay(user,maxTweets=maxTweets,count=newCount,tweetId=newTweetId,cacheKey=cacheKey,credentials=credentials)
+                getTweets.delay(user, maxTweets=maxTweets, count=newCount, tweetId=newTweetId, cacheKey=cacheKey, credentials=credentials)
             else:
-                pushTweets.delay([],user,cacheKey=cacheKey) # Nothing more found, so tell pushTweets the job is done.
+                pushTweets.delay([], user, cacheKey=cacheKey) # Nothing more found, so tell pushTweets the job is done.
         else:
             if result == '404':
                 setUserDefunct(user)
-            cache.set('scrape_tweets','done')
+            cache.set('scrape_tweets', 'done')
             if result == 'limited':
-                raise getTweets.retry(countdown = api.get_user_timeline_limited())
+                raise getTweets.retry(countdown = api.get_user_timeline_wait())
 
 @app.task
 def pushRenderedConnections2Neo(user, renderedTwits, friends=True):
@@ -345,3 +348,32 @@ def doUserScrape():
         cache.set('user_scrape','')
         cache.set('scrape_mode','')        
         print('*** FINISHED SCRAPING USER: '+user+' ***')
+
+
+#TODO: move this task to different module, also redesign how it is called perhaps?
+@app.task
+def cluster(seed, seed_type, query_name):
+
+    if seed_type == 'twitter_user':
+        seed_id_name = 'screen_name'
+        if query_name == "TransFoF":
+            query = twitterTransFofQuery(seed)
+        elif query_name == 'FoF':
+            query = twitterTransFofQuery(seed)
+        else:
+            print('*** clustering not yet implemented for seed type ***')
+            return
+    else:
+        print('*** clustering not yet implemented for seed type ***')
+        return
+    matrix_results = twitterMatrix(query)
+
+    cluster_results = clusterize(matrix_results[1])
+
+    labelled_clusters = labelClusters(cluster_results[0], matrix_results[0])
+
+    if seed_type == 'twitter_user':
+        user_clusters_to_neo(labelled_clusters, [seed], query)
+    else:
+        print('*** clustering not yet implemented for seed type ***')
+

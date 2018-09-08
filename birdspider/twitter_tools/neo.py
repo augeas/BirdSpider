@@ -87,23 +87,24 @@ def connections2Neo(user, renderedTwits, friends=True):
             tx.run(query, data=data)
 
 
-def tweets2Neo(renderedTweets,label='tweet'):
-    started = datetime.now()
-    rightNow = started.isoformat()    
+def tweets2Neo(renderedTweets, label='tweet'):
+    #started = datetime.now()
+    #rightNow = started.isoformat()
 
     tweets = (t[-1] for t in renderedTweets)
 
-    data = [{'id':tweet['id'], 'props':tweet} for tweet in renderedTweets]
+    data = [{'id':tweet['id'], 'props':tweet} for tweet in tweets]
 
-    query = '''UNWIND {data} AS d
-        MERGE (x:{} {id: d.id})
-        SET x += d.props'''.format(label)
+    merge = "MERGE (x:{} {{id: d.id}})".format(label)
+    update = "SET x += d.props"
+
+    query = '\n'.join(['UNWIND {data} AS d', merge, update])
         
     with neoDb.session() as session:
         with session.begin_transaction() as tx:
             tx.run(query, data=data)
 
-def tweetActions(user,renderedTweets,label='tweet'):
+def tweetActions(user, renderedTweets, label='tweet'):
     actions = {'tweet':'TWEETED', 'retweet':'RETWEETED', 'quotetweet':'QUOTED'}
 
     match = ("MATCH (u:twitter_user {{screen_name: '{}'}})," +
@@ -138,7 +139,7 @@ def tweetLinks(links,src_label,dest_label,relation):
             tx.run(query, data=data)    
 
 
-def tweetDump2Neo(user,tweetDump):
+def tweetDump2Neo(user, tweetDump):
     """Store a rendered set of tweets by a given user in Neo4J.
        
     Positional arguments:
@@ -148,8 +149,8 @@ def tweetDump2Neo(user,tweetDump):
     """
     
     for label in ['tweet', 'retweet', 'quotetweet']:
-        tweets2Neo(tweetDump[label],label=label)
-        tweetActions(user,tweetDump[label],label=label)
+        tweets2Neo(tweetDump[label], label=label)
+        tweetActions(user, tweetDump[label], label=label)
 
 
 def setUserDefunct(user):

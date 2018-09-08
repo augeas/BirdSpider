@@ -111,4 +111,3 @@ def decomposeTweets(tweets):
     cleanMentions(allEntities['quotetweet'])
     
     return {'tweet':allTweets, 'retweet':allRetweets, 'quotetweet':allQuoteTweets,'entities':allEntities, 'replies':allReplies}
-            
