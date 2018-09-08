@@ -27,7 +27,7 @@ def renderTwitterUser(user):
         twit['isotime'] = twitterTime(user['created_at'])    
     return twit
 
-def renderTweet(tweet):
+def renderTweet(tweet, get_user=False):
     """Return a serializable dictionary of relevant fields for a tweet."""
     rendered = {field:tweet[field] for field in tweetFields if tweet.get(field,False)}
     if tweet.get('created_at',False):
@@ -36,9 +36,14 @@ def renderTweet(tweet):
         lng, lat = tweet['coordinates']['coordinates']
         rendered['longitude'] = lng
         rendered['latitude'] = lat
-    if tweet.get('user',False):
-        rendered['user'] = renderTwitterUser(tweet['user'])
-    return rendered
+    if get_user:
+        if tweet.get('user',False):
+            rendered_user = renderTwitterUser(tweet['user'])
+        else:
+            rendered_user = False
+        return (rendered,rendered_user)
+    else:
+        return rendered
 
 entity_types = ['user_mentions', 'hashtags', 'urls']
 
@@ -74,6 +79,7 @@ def decomposeTweets(tweets):
     allTweets = []
     allRetweets = []
     allQuoteTweets = []
+    allUsers = {}
     
     allEntities = {key:entityStore() for key in ['tweet', 'retweet', 'quotetweet']}
     
@@ -84,17 +90,19 @@ def decomposeTweets(tweets):
         
         if retweeted and not quoted_status:
             raw = tweet['retweeted_status']
-            renderedTweet = renderTweet(raw)
+            renderedTweet, rendered_user = renderTweet(raw, get_user=True)
             renderedRetweet = renderTweet(tweet)
             allRetweets.append((renderedTweet,renderedRetweet))
             pushEntities(raw, allEntities['retweet'])
+            allUsers[renderedTweet['id_str']] = rendered_user
         
         if quoted_status and not retweeted:
             raw = quoted_status
-            renderedTweet = renderTweet(raw)
+            renderedTweet, rendered_user = renderTweet(raw, get_user=True)
             renderedQuoteTweet = renderTweet(tweet)
             allQuoteTweets.append((renderedTweet,renderedQuoteTweet))
             pushEntities(raw, allEntities['quotetweet'])
+            allUsers[renderedTweet['id_str']] = rendered_user
         
         if not retweeted and not quoted_status:
             renderedTweet = renderTweet(tweet)
@@ -110,4 +118,5 @@ def decomposeTweets(tweets):
     cleanMentions(allEntities['retweet'])
     cleanMentions(allEntities['quotetweet'])
     
-    return {'tweet':allTweets, 'retweet':allRetweets, 'quotetweet':allQuoteTweets,'entities':allEntities, 'replies':allReplies}
+    return {'tweet':allTweets, 'retweet':allRetweets, 'quotetweet':allQuoteTweets,'entities':allEntities, 'replies':allReplies,
+    'users':allUsers}

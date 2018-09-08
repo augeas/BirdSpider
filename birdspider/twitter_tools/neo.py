@@ -110,7 +110,7 @@ def tweetActions(user, renderedTweets, label='tweet'):
     match = ("MATCH (u:twitter_user {{screen_name: '{}'}})," +
         " (t:{} {{id_str: t.id_str}})").format(user, label)
 
-    merge = "MERGE (u)-[:{}]->(t)".format(actions['label'])
+    merge = "MERGE (u)-[:{}]->(t)".format(actions[label])
 
     query = '\n'.join(['UNWIND {data} AS d', match, merge])
 
@@ -152,6 +152,7 @@ def tweetDump2Neo(user, tweetDump):
         tweets2Neo(tweetDump[label], label=label)
         tweetActions(user, tweetDump[label], label=label)
 
+    tweetLinks(tweetDump['retweet'])
 
 def setUserDefunct(user):
     try:
