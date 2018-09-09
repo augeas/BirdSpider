@@ -150,7 +150,7 @@ def tweetDump2Neo(user, tweetDump):
     
     for label in ['tweet', 'retweet', 'quotetweet']:
         tweets2Neo(tweetDump[label], label=label)
-        tweetActions
+        tweetActions(user, tweetDump['label'], label=label)
         
     for label in ['retweet', 'quotetweet']:
         tweets = [(tw[0],) for tw in tweetDump[label]]
