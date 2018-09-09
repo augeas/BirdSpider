@@ -75,7 +75,7 @@ def cleanMentions(entities):
         m[1].pop('indices')
 
 def decomposeTweets(tweets):
-    """Decompose a list of tweets returned by Twython into lists of rendered tweets, retweets, mentions, hastags, URLs and replies."""
+    """Decompose a list of tweets returned by Twython into lists of rendered tweets, retweets, mentions, hastags, URLs and replies. Be sure to set trim_user=False and exclude_replies=False in get_user_timeline."""
     allTweets = []
     allRetweets = []
     allQuoteTweets = []

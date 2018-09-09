@@ -121,6 +121,20 @@ def tweetActions(user, renderedTweets, label='tweet'):
         with session.begin_transaction() as tx:
             tx.run(query, data=data)
 
+def multi_user_tweet_actions(tweet_user_dump):
+    match = ("MATCH (u:twitter_user {screen_name: d.name}), " +
+        "(t:tweet {id_str: d.id})")
+    
+    merge = "MERGE (u)-[:TWEETED]->(t)"
+    
+    query = '\n'.join(['UNWIND {data} AS d', match, merge])
+    
+    data = [{'name':user['screen_name'], 'id':id_str} for id_str,user in
+        tweet_user_dump.items()]
+    
+    with neoDb.session() as session:
+        with session.begin_transaction() as tx:
+            tx.run(query, data=data)    
 
 def tweetLinks(links,src_label,dest_label,relation):
     
@@ -148,16 +162,24 @@ def tweetDump2Neo(user, tweetDump):
 
     """
     
+    # user->[tweeted/RTed/quoted]->(tweet/RT/quoteTweet)
     for label in ['tweet', 'retweet', 'quotetweet']:
         tweets2Neo(tweetDump[label], label=label)
         tweetActions(user, tweetDump[label], label=label)
-        
+    
+    # push original tweets from RTs/quotes
     for label in ['retweet', 'quotetweet']:
         tweets = [(tw[0],) for tw in tweetDump[label]]
         tweets2Neo(tweets,label='tweet')
-        
+    
+    # (RT/quote)-[RETWEET_OF/QUOTE_OF]->(tweet)
     tweetLinks(tweetDump['retweet'],'retweet','tweet','RETWEET_OF')
     tweetLinks(tweetDump['quotetweet'],'quotetweet','tweet','QUOTE_OF')
+
+    # push users of original tweets, and [TWEETED] relationship
+    users2Neo(tweetDump['users'].values())
+    multi_user_tweet_actions(tweetDump['users'])
+
 
 def setUserDefunct(user):
     try:
