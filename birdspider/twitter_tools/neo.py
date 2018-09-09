@@ -131,7 +131,7 @@ def tweetLinks(links,src_label,dest_label,relation):
 
     query = '\n'.join(['UNWIND {data} AS d', match, merge])
 
-    data = [{'src_id_str':src['id_str'], 'dest_id_str':dest['id_str']} for src,dest in links]
+    data = [{'src_id_str':src['id_str'], 'dest_id_str':dest['id_str']} for dest,src in links]
     
     with neoDb.session() as session:
 
@@ -156,8 +156,8 @@ def tweetDump2Neo(user, tweetDump):
         tweets = [(tw[0],) for tw in tweetDump[label]]
         tweets2Neo(tweets,label='tweet')
         
-    tweetLinks(tweetDump['retweet'],'retweet','tweet','RETWEETED_IN')
-    tweetLinks(tweetDump['quotetweet'],'quotetweet','tweet','QUOTED_IN')
+    tweetLinks(tweetDump['retweet'],'retweet','tweet','RETWEET_OF')
+    tweetLinks(tweetDump['quotetweet'],'quotetweet','tweet','QUOTE_OF')
 
 def setUserDefunct(user):
     try:
