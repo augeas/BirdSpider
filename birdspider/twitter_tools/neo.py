@@ -124,10 +124,10 @@ def tweetActions(user, renderedTweets, label='tweet'):
 
 def tweetLinks(links,src_label,dest_label,relation):
     
-    match = ("MATCH (s:{} {{id_str: d.src_id_str}}),"
-        +" (d:{} {{id_str: d.dest_id_str}})").format(src_label,dest_label)
+    match = ("MATCH (src:{} {{id_str: d.src_id_str}}),"
+        +" (dst:{} {{id_str: d.dest_id_str}})").format(src_label,dest_label)
 
-    merge = "MERGE (s)-[:{}]->(d)".format(relation)
+    merge = "MERGE (src)-[:{}]->(dst)".format(relation)
 
     query = '\n'.join(['UNWIND {data} AS d', match, merge])
 
@@ -150,9 +150,14 @@ def tweetDump2Neo(user, tweetDump):
     
     for label in ['tweet', 'retweet', 'quotetweet']:
         tweets2Neo(tweetDump[label], label=label)
-        tweetActions(user, tweetDump[label], label=label)
-
-    tweetLinks(tweetDump['retweet'])
+        tweetActions
+        
+    for label in ['retweet', 'quotetweet']:
+        tweets = [(tw[0],) for tw in tweetDump[label]]
+        tweets2Neo(tweets,label='tweet')
+        
+    tweetLinks(tweetDump['retweet'],'retweet','tweet','RETWEETED_IN')
+    tweetLinks(tweetDump['quotetweet'],'quotetweet','tweet','QUOTED_IN')
 
 def setUserDefunct(user):
     try:

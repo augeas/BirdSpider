@@ -29,7 +29,6 @@ tweetFields = ['text','in_reply_to_status_id','id','favorite_count','source','re
     'in_reply_to_user_id_str','possibly_sensitive','lang','created_at','in_reply_to_status_id_str'] +  ['isotime','last_scraped','__temp_label__']
 
    
-        
 def getTwitterAPI(credentials=False):
     """Return a Twitter API object from oauth credentials, defaulting to those in db_settings."""
     if not credentials:
