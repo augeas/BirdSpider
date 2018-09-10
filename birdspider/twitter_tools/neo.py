@@ -216,13 +216,13 @@ def tweetDump2Neo(user, tweetDump):
     multi_user_tweet_actions(tweetDump['users'])
     
     # mentions
-    #for label in ['tweet', 'retweet', 'quotetweet']:
-    #    mentions = [m[1] for m in tweetDump['entities'][label]['user_mentions']]
-    #    users2Neo(mentions)
-    #    entities = [(m[0],m[1]['screen_name']) for m in tweetDump['entities'][label]['user_mentions']]
-    #    entity_links(entities,'MENTIONS',label,'twitter_user','id_str',
-    #        'screen_name')
+    for label in ['tweet', 'retweet', 'quotetweet']:
+        mentions = [m[1] for m in tweetDump['entities'][label]['user_mentions']]
+        users2Neo(mentions)
+        entities = tweetDump['entities'][label]['user_mentions']
+        entity_links(entities, 'MENTIONS', label, 'twitter_user', 'id_str', 'screen_name')
 
+    # hastags, urls and media
     for label in ['tweet', 'retweet', 'quotetweet']:
         for entity_type in ['hashtags', 'urls', 'media']:
             entities = [e[1] for e in tweetDump['entities'][label][entity_type]]
