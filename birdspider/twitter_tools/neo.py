@@ -153,8 +153,8 @@ def tweetLinks(links,src_label,dest_label,relation):
             tx.run(query, data=data)    
 
 
-entity_node_lables = {'hashtags': 'hashtag', 'urls':'url'}
-entity_ids = {'hashtags': 'text', 'urls': 'expanded_url'}
+entity_node_lables = {'hashtags': 'hashtag', 'urls':'url', 'media': 'media'}
+entity_ids = {'hashtags': 'text', 'urls': 'expanded_url', 'media': 'expanded_url'}
 
 
 def entities2neo(entities,entity_type):    
@@ -224,12 +224,14 @@ def tweetDump2Neo(user, tweetDump):
     #        'screen_name')
 
     for label in ['tweet', 'retweet', 'quotetweet']:
-        for entity_type in ['hashtags', 'urls']:
+        for entity_type in ['hashtags', 'urls', 'media']:
             entities = [e[1] for e in tweetDump['entities'][label][entity_type]]
             entities2neo(entities,entity_type)
 
         entity_links(tweetDump['entities'][label]['hashtags'], 'TAGGED', label, 'hashtag', 'id_str', 'text')
         entity_links(tweetDump['entities'][label]['urls'], 'LINKS_TO', label, 'url', 'id_str', 'expanded_url')
+        entity_links(tweetDump['entities'][label]['media'], 'EMBEDS', label, 'media', 'id_str', 'expanded_url')
+        
 
 
 def setUserDefunct(user):

@@ -47,6 +47,7 @@ def renderTweet(tweet, get_user=False):
 
 entity_types = ['user_mentions', 'hashtags', 'urls']
 
+
 def pushEntities(tweet, entity_store):
     tweet_id = tweet['id_str']
     entities = tweet.get('entities',False)
@@ -61,8 +62,11 @@ def pushEntities(tweet, entity_store):
     extended = tweet.get('extended_entities', False)
     if extended:
         for item in extended['media']:
-            item.pop('indices')
+            for key in ['indices', 'sizes', 'video_info']:
+                if item.get(key,False):
+                    item.pop(key)
             entity_store['media'].append((tweet_id, item))
+
 
 def entityStore():
     ents = {key:[] for key in entity_types}
