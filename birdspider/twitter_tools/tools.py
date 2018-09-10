@@ -56,10 +56,12 @@ def pushEntities(tweet, entity_store):
                 (tweet_id,renderTwitterUser(item)))
         for key in entity_types[1:]:
             for item in entities[key]:
+                item.pop('indices')
                 entity_store[key].append((tweet_id, item))
     extended = tweet.get('extended_entities', False)
     if extended:
         for item in extended['media']:
+            item.pop('indices')
             entity_store['media'].append((tweet_id, item))
 
 def entityStore():
@@ -88,11 +90,11 @@ def decomposeTweets(tweets):
     
     for tweet in tweets:
         
-        retweeted = tweet.get('retweeted',False)
+        retweeted = tweet.get('retweeted_status',False)
         quoted_status = tweet.get('quoted_status',False)
         
         if retweeted and not quoted_status:
-            raw = tweet['retweeted_status']
+            raw = retweeted
             renderedTweet, rendered_user = renderTweet(raw, get_user=True)
             renderedRetweet = renderTweet(tweet)
             allRetweets.append((renderedTweet,renderedRetweet))

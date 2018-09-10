@@ -108,7 +108,7 @@ def tweetActions(user, renderedTweets, label='tweet'):
     actions = {'tweet':'TWEETED', 'retweet':'RETWEETED', 'quotetweet':'QUOTED'}
 
     match = ("MATCH (u:twitter_user {{screen_name: '{}'}})," +
-        " (t:{} {{id_str: t.id_str}})").format(user, label)
+        " (t:{} {{id_str: d.id_str}})").format(user, label)
 
     merge = "MERGE (u)-[:{}]->(t)".format(actions[label])
 
@@ -151,6 +151,26 @@ def tweetLinks(links,src_label,dest_label,relation):
 
         with session.begin_transaction() as tx:
             tx.run(query, data=data)    
+
+
+entity_node_lables = {'hashtags': 'hashtag'}
+entity_ids = {'hashtags': 'text'}
+
+
+def entities2neo(entities,entity_type):    
+    merge = "MERGE (x:{} {{id: d.id}})".format(entity_node_lables[entity_type])
+    
+    update = "SET x += d.props"
+    
+    id_field = entity_ids[entity_type]
+    data = [{'id': e[id_field], 'props': e} for e in entities]
+
+    query = '\n'.join(['UNWIND {data} AS d', merge, update])
+        
+    with neoDb.session() as session:
+        with session.begin_transaction() as tx:
+            tx.run(query, data=data)
+
 
 def entity_links(entities, relation, src_label, dest_label, src_prop, dest_prop):
     match = ("MATCH (src:{} {{{}:d.src}}), (dest:{} {{{}:d.dest}})").format(
@@ -201,6 +221,14 @@ def tweetDump2Neo(user, tweetDump):
     #    entities = [(m[0],m[1]['screen_name']) for m in tweetDump['entities'][label]['user_mentions']]
     #    entity_links(entities,'MENTIONS',label,'twitter_user','id_str',
     #        'screen_name')
+
+
+    for label in ['tweet', 'retweet', 'quotetweet']:
+        for entity_type in ['hashtags']:
+            entities = [e[1] for e in tweetDump['entities'][label][entity_type]]
+            entities2neo(entities,entity_type)
+
+        #entity_links(tweetDump['entities'][label][entity_type], relation, src_label, dest_label, src_prop, dest_prop):
 
 
 def setUserDefunct(user):
