@@ -153,8 +153,8 @@ def tweetLinks(links,src_label,dest_label,relation):
             tx.run(query, data=data)    
 
 
-entity_node_lables = {'hashtags': 'hashtag'}
-entity_ids = {'hashtags': 'text'}
+entity_node_lables = {'hashtags': 'hashtag', 'urls':'url'}
+entity_ids = {'hashtags': 'text', 'urls': 'expanded_url'}
 
 
 def entities2neo(entities,entity_type):    
@@ -186,6 +186,7 @@ def entity_links(entities, relation, src_label, dest_label, src_prop, dest_prop)
 
         with session.begin_transaction() as tx:
             tx.run(query, data=data) 
+
 
 def tweetDump2Neo(user, tweetDump):
     """Store a rendered set of tweets by a given user in Neo4J.
@@ -223,11 +224,12 @@ def tweetDump2Neo(user, tweetDump):
     #        'screen_name')
 
     for label in ['tweet', 'retweet', 'quotetweet']:
-        for entity_type in ['hashtags']:
+        for entity_type in ['hashtags', 'urls']:
             entities = [e[1] for e in tweetDump['entities'][label][entity_type]]
             entities2neo(entities,entity_type)
 
         entity_links(tweetDump['entities'][label]['hashtags'], 'TAGGED', label, 'hashtag', 'id_str', 'text')
+        entity_links(tweetDump['entities'][label]['urls'], 'LINKS_TO', label, 'url', 'id_str', 'expanded_url')
 
 
 def setUserDefunct(user):
