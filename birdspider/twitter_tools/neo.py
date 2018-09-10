@@ -254,8 +254,8 @@ def user_clusters_to_neo(labelled_clusters, seed_user, adjacency_criteria):
     # create cluster with relation 'clustered_by' linking it to Clustering
     # cluster<-member_of-clustering
     # cluster has one property, size
-    cluster_match = ("MATCH (a:Clustering) WHERE ID(a) = {}").format(clustering_id)
-    create = " CREATE (b:Cluster {size: $size})-[:CLUSTERED_BY]->(a) RETURN id(b)"
+    cluster_match = ("MATCH (a:clustering) WHERE ID(a) = {}").format(clustering_id)
+    create = " CREATE (b:cluster {size: $size})-[:CLUSTERED_BY]->(a) RETURN id(b)"
     clustered_by_query = ' '.join([cluster_match, create])
     for cluster in labelled_clusters:
         with neoDb.session() as session:
@@ -264,7 +264,7 @@ def user_clusters_to_neo(labelled_clusters, seed_user, adjacency_criteria):
 
         # match screen_names to users, add relation 'member_of'
         match = ("MATCH (m:twitter_user {screen_name: d}), "
-                 + "(c:Cluster) WHERE ID(c) = {}").format(cluster_id)
+                 + "(c:cluster) WHERE ID(c) = {}").format(cluster_id)
         # user-member_of->cluster
         merge = "MERGE (m)-[:MEMBER_OF]->(c)"
         relation_query = '\n'.join(['UNWIND {data} AS d', match, merge])
@@ -288,7 +288,7 @@ def clustering_to_neo(seed, seed_type, seed_id_label, adjacency_criteria):
             clustering_id = tx.run(create_query, data=clustering_data).single().value()
 
     #relationship: seed--seed_for-->clustering
-    match = ("MATCH (c:Clustering),"
+    match = ("MATCH (c:clustering),"
              + " (s:{} {{{}: d}})"
              + " WHERE ID(c) = {}").format(seed_type, seed_id_label, clustering_id)
 
