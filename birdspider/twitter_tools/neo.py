@@ -139,9 +139,9 @@ def multi_user_tweet_actions(tweet_user_dump):
 
 def tweetLinks(links,src_label,dest_label,relation):
     match = ("MATCH (src:{} {{id_str: d.src_id_str}}),"
-        +" (dst:{} {{id_str: d.dest_id_str}})").format(src_label,dest_label)
+        +" (dest:{} {{id_str: d.dest_id_str}})").format(src_label,dest_label)
 
-    merge = "MERGE (src)-[:{}]->(dst)".format(relation)
+    merge = "MERGE (src)-[:{}]->(dest)".format(relation)
 
     query = '\n'.join(['UNWIND {data} AS d', match, merge])
 
@@ -154,7 +154,7 @@ def tweetLinks(links,src_label,dest_label,relation):
 
 
 entity_node_lables = {'hashtags': 'hashtag', 'urls':'url', 'media': 'media'}
-entity_ids = {'hashtags': 'text', 'urls': 'expanded_url', 'media': 'expanded_url'}
+entity_ids = {'hashtags': 'text', 'urls': 'expanded_url', 'media': 'id_str'}
 
 
 def entities2neo(entities,entity_type):    
@@ -176,7 +176,7 @@ def entity_links(entities, relation, src_label, dest_label, src_prop, dest_prop)
     match = ("MATCH (src:{} {{{}:d.src}}), (dest:{} {{{}:d.dest}})").format(
     src_label,src_prop,dest_label,dest_prop)
     
-    merge = "MERGE (src)-[:{}]->(dst)".format(relation)
+    merge = "MERGE (src)-[:{}]->(dest)".format(relation)
     
     query = '\n'.join(['UNWIND {data} AS d', match, merge])
     
@@ -230,7 +230,7 @@ def tweetDump2Neo(user, tweetDump):
 
         entity_links(tweetDump['entities'][label]['hashtags'], 'TAGGED', label, 'hashtag', 'id_str', 'text')
         entity_links(tweetDump['entities'][label]['urls'], 'LINKS_TO', label, 'url', 'id_str', 'expanded_url')
-        entity_links(tweetDump['entities'][label]['media'], 'EMBEDS', label, 'media', 'id_str', 'expanded_url')
+        entity_links(tweetDump['entities'][label]['media'], 'EMBEDS', label, 'media', 'id_str', 'id_str')
         
 
 
