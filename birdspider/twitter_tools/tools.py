@@ -51,7 +51,10 @@ def pushEntities(tweet, entity_store):
     tweet_id = tweet['id_str']
     entities = tweet.get('entities',False)
     if entities:    
-        for key in entity_types:
+        for item in entities['user_mentions']:
+            entity_store['user_mentions'].append(
+                (tweet_id,renderTwitterUser(item)))
+        for key in entity_types[1:]:
             for item in entities[key]:
                 entity_store[key].append((tweet_id, item))
     extended = tweet.get('extended_entities', False)
@@ -114,9 +117,9 @@ def decomposeTweets(tweets):
     allReplies['retweet'] = list(replies(allRetweets))
     allReplies['quotetweet'] = list(replies(allQuoteTweets))
 
-    cleanMentions(allEntities['tweet'])
-    cleanMentions(allEntities['retweet'])
-    cleanMentions(allEntities['quotetweet'])
+    #cleanMentions(allEntities['tweet'])
+    #cleanMentions(allEntities['retweet'])
+    #cleanMentions(allEntities['quotetweet'])
     
     return {'tweet':allTweets, 'retweet':allRetweets, 'quotetweet':allQuoteTweets,'entities':allEntities, 'replies':allReplies,
     'users':allUsers}
