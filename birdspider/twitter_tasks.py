@@ -96,7 +96,8 @@ def pushTweets(tweets, user, cacheKey=False):
     tweetDump = decomposeTweets(tweets) # Extract mentions, URLs, replies hashtags etc...
 
     pushRenderedTweets2Neo.delay(user, tweetDump)
-    pushRenderedTweets2Solr.delay(tweetDump['tweet']+tweetDump['retweet'])
+    for label in ['tweet', 'retweet', 'quotetweet']:
+        pushRenderedTweets2Solr.delay([t[0] for t in tweetDump[label]])
 
     if cacheKey: # These are the last Tweets, tell the scaper we're done.
         cache.set(cacheKey,'done')
@@ -124,7 +125,7 @@ def getTweets(user, maxTweets=3000, count=0, tweetId=0, cacheKey=False, credenti
         print('*** TWITTER RATE-LIMITED: statuses.user_timeline:'+user+':'+str(count)+' ***')
         raise getTweets.retry(countdown=limit)
     else:
-        args = {'screen_name':user,'exclude_replies':False,'include_rts':True,'trim_user':False,'count':200}
+        args = {'screen_name': user, 'exclude_replies': False, 'include_rts': True, 'trim_user': False, 'count': 200}
         if tweetId:
             args['max_id'] = tweetId
         
