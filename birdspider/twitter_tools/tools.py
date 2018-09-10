@@ -118,10 +118,6 @@ def decomposeTweets(tweets):
     allReplies['tweet'] = list(replies(allTweets))
     allReplies['retweet'] = list(replies(allRetweets))
     allReplies['quotetweet'] = list(replies(allQuoteTweets))
-
-    #cleanMentions(allEntities['tweet'])
-    #cleanMentions(allEntities['retweet'])
-    #cleanMentions(allEntities['quotetweet'])
     
     return {'tweet':allTweets, 'retweet':allRetweets, 'quotetweet':allQuoteTweets,'entities':allEntities, 'replies':allReplies,
     'users':allUsers}

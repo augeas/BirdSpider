@@ -180,7 +180,7 @@ def entity_links(entities, relation, src_label, dest_label, src_prop, dest_prop)
     
     query = '\n'.join(['UNWIND {data} AS d', match, merge])
     
-    data = [{'src':src, 'dest':dest} for (src,dest) in entities]
+    data = [{'src':src, 'dest':dest[dest_prop]} for (src,dest) in entities]
     
     with neoDb.session() as session:
 
@@ -222,13 +222,12 @@ def tweetDump2Neo(user, tweetDump):
     #    entity_links(entities,'MENTIONS',label,'twitter_user','id_str',
     #        'screen_name')
 
-
     for label in ['tweet', 'retweet', 'quotetweet']:
         for entity_type in ['hashtags']:
             entities = [e[1] for e in tweetDump['entities'][label][entity_type]]
             entities2neo(entities,entity_type)
 
-        #entity_links(tweetDump['entities'][label][entity_type], relation, src_label, dest_label, src_prop, dest_prop):
+        entity_links(tweetDump['entities'][label]['hashtags'], 'TAGGED', label, 'hashtag', 'id_str', 'text')
 
 
 def setUserDefunct(user):
