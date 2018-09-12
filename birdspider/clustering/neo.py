@@ -26,8 +26,7 @@ def user_clusters_to_neo(labelled_clusters, seed_user, adjacency_criteria):
                 cluster_id = tx.run(clustered_by_query, size=len(cluster)).single().value()
 
         # match screen_names to users, add relation 'member_of'
-        match = ("MATCH (m:twitter_user {screen_name: d}), "
-                 + "(c:cluster) WHERE ID(c) = {}").format(cluster_id)
+        match = "MATCH (m:twitter_user {screen_name: d}), (c:cluster) WHERE ID(c) = {}".format(cluster_id)
         # user-member_of->cluster
         merge = "MERGE (m)-[:MEMBER_OF]->(c)"
         relation_query = '\n'.join(['UNWIND {data} AS d', match, merge])

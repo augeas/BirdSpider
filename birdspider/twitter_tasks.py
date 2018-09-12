@@ -257,28 +257,28 @@ def startScrape(latest=False):
 @app.task
 def doDefaultScrape(latest=False):
     """Retrieve the tweets, friends or followers of trhe next users in the default scrape."""
-    keep_going = cache.get('default_scrape')
+    keep_going = cache.get('default_scrape').decode('utf-8')
     if (not keep_going) or keep_going != 'true':
         print('*** STOPPED DEFAULT SCRAPE ***') 
         return False
     
     print('*** SCRAPING... ***')
 
-    this_friend = cache.get('scrape_friends')
+    this_friend = cache.get('scrape_friends').decode('utf-8')
     if (not this_friend) or this_friend == 'done':
         cache.set('scrape_friends','running')
         getTwitterConnections.delay(whoNext('friends', latest=latest), cacheKey='scrape_friends')
     else:
         print('*** FRIENDS BUSY ***')
 
-    this_follower = cache.get('scrape_followers')
+    this_follower = cache.get('scrape_followers').decode('utf-8')
     if (not this_follower) or this_follower == 'done':
         cache.set('scrape_followers','running')
         getTwitterConnections.delay(whoNext('friends', latest=latest), friends=False, cacheKey='scrape_followers')
     else:
         print("*** FOLLOWERS BUSY ***")
 
-    this_tweet = cache.get('scrape_tweets')
+    this_tweet = cache.get('scrape_tweets').decode('utf-8')
     if (not this_tweet) or this_tweet == 'done':
         cache.set('scrape_tweets', 'running')
         getTweets.delay(whoNext('tweets', latest=latest), maxTweets=1000, cacheKey='scrape_tweets')
@@ -307,15 +307,15 @@ def startUserScrape(user):
 @app.task
 def doUserScrape():
     """Retrieve the next timelines, friends and followers for the next accounts in the user scrape. """
-    keep_going = cache.get('user_scrape')
+    keep_going = cache.get('user_scrape').decode('utf-8')
     if (not keep_going) or keep_going != 'true':
         print('*** STOPPED USER SCRAPE ***') 
         return False
     
-    user = cache.get('scrape_user')
+    user = cache.get('scrape_user').decode('utf-8')
     print('*** SCRAPING USER: '+user+'... ***')
 
-    this_friend = cache.get('scrape_friends')
+    this_friend = cache.get('scrape_friends').decode('utf-8')
     if (not this_friend) or this_friend == 'done':
         next_friends = nextNearest(user, 'friends')
         if next_friends:
@@ -324,7 +324,7 @@ def doUserScrape():
     else:
         print('*** FRIENDS BUSY ***')
 
-    this_follower = cache.get('scrape_followers')
+    this_follower = cache.get('scrape_followers').decode('utf-8')
     if (not this_follower) or this_follower == 'done':
         next_followers = nextNearest(user,'followers')
         if next_followers:
@@ -333,7 +333,7 @@ def doUserScrape():
     else:
         print('*** FOLLOWERS BUSY ***')
 
-    this_tweet = cache.get('scrape_tweets')
+    this_tweet = cache.get('scrape_tweets').decode('utf-8')
     if (not this_tweet) or this_tweet == 'done':
         next_tweets = nextNearest(user, 'tweets')
         if next_tweets:
@@ -342,7 +342,7 @@ def doUserScrape():
     else:
         print('*** TWEETS BUSY ***')
 
-    if 'running' in [cache.get(k) for k in ['scrape_friends', 'scrape_followers', 'scrape_tweets']]:
+    if 'running' in [cache.get(k).decode('utf-8') for k in ['scrape_friends', 'scrape_followers', 'scrape_tweets']]:
         doUserScrape.apply_async(countdown=30)
     else:
         cache.set('user_scrape', '')
