@@ -17,7 +17,7 @@ def user_clusters_to_neo(labelled_clusters, seed_user, adjacency_criteria):
     # create cluster with relation 'clustered_by' linking it to Clustering
     # cluster<-member_of-clustering
     # cluster has one property, size
-    cluster_match = ("MATCH (a:clustering) WHERE ID(a) = {}").format(clustering_id)
+    cluster_match = "MATCH (a:clustering) WHERE ID(a) = {}".format(clustering_id)
     create = " CREATE (b:cluster {size: $size})-[:CLUSTERED_BY]->(a) RETURN id(b)"
     clustered_by_query = ' '.join([cluster_match, create])
     for cluster in labelled_clusters:
@@ -37,10 +37,10 @@ def user_clusters_to_neo(labelled_clusters, seed_user, adjacency_criteria):
 
 def clustering_to_neo(seed, seed_type, seed_id_label, adjacency_criteria):
     started = datetime.now()
-    rightNow = started.isoformat()
+    right_now = started.isoformat()
 
-    #push new node to neo4j
-    clustering_data = {'timestamp': rightNow, 'adjacency_criteria': adjacency_criteria}
+    # push new node to neo4j
+    clustering_data = {'timestamp': right_now, 'adjacency_criteria': adjacency_criteria}
     create_query = '''UNWIND {data} AS d
         CREATE (a:Clustering {timestamp: d.timestamp, adjacency_criteria: d.adjacency_criteria})
         RETURN id(a)'''
@@ -49,11 +49,8 @@ def clustering_to_neo(seed, seed_type, seed_id_label, adjacency_criteria):
         with session.begin_transaction() as tx:
             clustering_id = tx.run(create_query, data=clustering_data).single().value()
 
-    #relationship: seed--seed_for-->clustering
-    match = ("MATCH (c:clustering),"
-             + " (s:{} {{{}: d}})"
-             + " WHERE ID(c) = {}").format(seed_type, seed_id_label, clustering_id)
-
+    # relationship: seed--seed_for-->clustering
+    match = "MATCH (c:clustering), (s:{} {{{}: d}}) WHERE ID(c) = {}".format(seed_type, seed_id_label, clustering_id)
 
     merge = "MERGE (s)-[:SEED_FOR]->(c)"
 

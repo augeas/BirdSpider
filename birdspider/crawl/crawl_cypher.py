@@ -31,7 +31,7 @@ def nextFriends(latest=False, max_friends=2000, max_followers=2000, limit=20):
     with neoDb.session() as session:
         with session.begin_transaction() as tx:
             result = tx.run(query)
-            next_friends = [record.values[0] for record in result]
+            next_friends = [record.values()[0] for record in result]
 
     return next_friends
 
@@ -48,7 +48,7 @@ def nextFollowers(latest=False, max_friends=2000, max_followers=2000, limit=20):
     with neoDb.session() as session:
         with session.begin_transaction() as tx:
             result = tx.run(query)
-            next_followers = [record.values[0] for record in result]
+            next_followers = [record.values()[0] for record in result]
 
     return next_followers
 
@@ -65,7 +65,7 @@ def nextTweets(latest=False, max_friends=2000, max_followers=2000, limit=20, max
     with neoDb.session() as session:
         with session.begin_transaction() as tx:
             result = tx.run(query)
-            next_tweets = [record.values[0] for record in result]
+            next_tweets = [record.values()[0] for record in result]
 
     return next_tweets
 
@@ -74,20 +74,20 @@ def whoNext(job, latest=False):
     """Find the next user to retrieve friends, followers or tweets, closest to the initial seed of the network."""
     if job == 'friends':
         victim_getter = nextFriends
-        
+
     if job == 'followers':
         victim_getter = nextFollowers
 
     if job == 'tweets':
         victim_getter = nextTweets
-          
+
     victim_list = False
     while not victim_list:
         try:
             victim_list = victim_getter(latest=latest)
         except:
             pass
-        
+
     return victim_list[0]
 
 
@@ -106,40 +106,40 @@ def nextNearest(user, job, max_friends=2000, max_followers=2000, limit=20, max_t
         next_user = next_users.pop(0)
         cache.set(cacheKey, json.dumps(next_users))
         return next_user
-    
-    queryStr = ('MATCH (a:twitter_user{{screen_name:"'+user+'"}})-[:FOLLOWS]-(d:twitter_user)').format()+'\n'
-    queryStr += ' MATCH (b:twitter_user)-[:FOLLOWS]-(d) WITH DISTINCT b '
+
+    query_str = "MATCH (a:twitter_user {{screen_name: '{}'}})-[:FOLLOWS]-(d:twitter_user)".format(user)
+    query_str += ' MATCH (b:twitter_user)-[:FOLLOWS]-(d) WITH DISTINCT b '
     if job == 'friends':
-        queryStr += 'MATCH (b)-[:FOLLOWS]->(c:twitter_user) '
+        query_str += 'MATCH (b)-[:FOLLOWS]->(c:twitter_user) '
     if job == 'followers':
-        queryStr += 'MATCH (b)<-[:FOLLOWS]-(c:twitter_user) '
+        query_str += 'MATCH (b)<-[:FOLLOWS]-(c:twitter_user) '
     if job == 'tweets':
-        queryStr += 'MATCH (b)-[:TWEETED]->(c:tweet) '
-    queryStr += 'WITH b, COUNT(c) AS n\n'     
-    queryStr += 'WHERE b.friends_count < {} AND b.followers_count < {} ' \
-                'AND NOT EXISTS (b.protected) AND NOT EXISTS (b.defunct) '.format(max_friends, max_followers)
+        query_str += 'MATCH (b)-[:TWEETED]->(c:tweet) '
+    query_str += 'WITH b, COUNT(c) AS n '
+    query_str += 'WHERE b.friends_count < {} AND b.followers_count < {} ' \
+                 'AND NOT EXISTS (b.protected) AND NOT EXISTS (b.defunct) '.format(max_friends, max_followers)
     if job == 'friends':
-        queryStr += 'AND n < b.friends_count/2\n'
+        query_str += 'AND n < b.friends_count/2 '
     if job == 'followers':
-        queryStr += 'AND n < b.followers_count/2\n'
+        query_str += 'AND n < b.followers_count/2 '
     if job == 'tweets':
-        queryStr += 'AND b.statuses_count > 0 AND n < b.statuses_count/2 AND n<{} '.format(max_tweets)
-    queryStr += 'RETURN b.screen_name ORDER BY b.{}_last_scraped LIMIT {}'.format(job, limit)
+        query_str += 'AND b.statuses_count > 0 AND n < b.statuses_count/2 AND n<{} '.format(max_tweets)
+    query_str += 'RETURN b.screen_name ORDER BY b.{}_last_scraped LIMIT {}'.format(job, limit)
 
     print('*** Looking for '+job+' ***')
- 
+
     if test:
-        return queryStr
-    
-    query = queryStr
+        return query_str
+
+    query = query_str
     try:
         with neoDb.session() as session:
             with session.begin_transaction() as tx:
                 result = tx.run(query)
-                next_users = [record.values[0] for record in result]
+                next_users = [record.values()[0] for record in result]
     except:
         next_users = []
-    
+
     if next_users:
         print('*** NEXT '+job+': '+', '.join(next_users)+' ***')
         next_user = next_users.pop(0)
@@ -147,5 +147,5 @@ def nextNearest(user, job, max_friends=2000, max_followers=2000, limit=20, max_t
         return next_user
     else:
         print('No more '+job+' for '+user)
-    
+
     return False

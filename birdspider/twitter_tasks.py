@@ -70,7 +70,7 @@ def getTwitterUsers(users,credentials=False):
     userList = ','.join(users)
     chain(twitterCall.s('lookup_user',**{'screen_name':userList}), pushTwitterUsers.s())()
 
-#TODO: finish fixing this it was WRONG tweets2Neo expects tweetDump as first argument, label as second!!! qustion is 'user' desired label? dfault is 'tweets'
+
 @app.task
 def pushRenderedTweets2Neo(user, tweetDump):
     tweetDump2Neo(user, tweetDump)
