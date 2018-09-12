@@ -62,7 +62,7 @@ def pushEntities(tweet, entity_store):
     extended = tweet.get('extended_entities', False)
     if extended:
         for item in extended['media']:
-            for key in ['indices', 'sizes', 'video_info']:
+            for key in ['indices', 'sizes', 'video_info', 'additional_media_info']:
                 if item.get(key,False):
                     item.pop(key)
             entity_store['media'].append((tweet_id, item))
