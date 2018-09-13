@@ -2,12 +2,14 @@ version: '2'
 services:
   neo4j:
     container_name: birdspider_neo
-    image: neo4j
+    image: neo4j:3.4
     ports:
      - "7474:7474"
+     - "7473:7473"
      - "7687:7687"
     environment:
-     - NEO4J_AUTH=none
+     - NEO4J_dbms_memory_pagecache_size=${NEO_RAM}
+     - NEO4J_AUTH=${NEO_USER}/${NEO_PW}
     volumes:
      - neo_data:/data
   solr:
@@ -42,7 +44,8 @@ services:
       - OAUTH_TOKEN=${OAUTH_TOKEN}
       - OAUTH_TOKEN_SECRET=${OAUTH_TOKEN_SECRET}
       - ACCESS_TOKEN=${ACCESS_TOKEN}
-          
+      - NEO_USER=${NEO_USER}
+      - NEO_PW=${NEO_PW}    
 volumes:
   neo_data:
   solr_data:
