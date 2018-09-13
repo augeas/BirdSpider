@@ -1,8 +1,11 @@
 version: '2'
 services:
   neo4j:
+    build:
+        context: .
+        dockerfile: Dockerfile.neo4j
     container_name: birdspider_neo
-    image: neo4j:3.4
+    network_mode: "bridge"
     ports:
      - "7474:7474"
      - "7473:7473"
@@ -10,8 +13,14 @@ services:
     environment:
      - NEO4J_dbms_memory_pagecache_size=${NEO_RAM}
      - NEO4J_AUTH=${NEO_USER}/${NEO_PW}
+     - NEO4J_dbms.security.procedures.unrestricted=algo.*
+     - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+     - NEO4J_apoc_import_file_enabled=true
+     - NEO4J_dbms_shell_enabled=true
     volumes:
      - neo_data:/data
+     - neo4j/conf:/conf
+     - neo4j/plugins:/plugins
   solr:
     container_name: birdspider_solr
     image: solr:alpine
@@ -50,4 +59,5 @@ volumes:
   neo_data:
   solr_data:
   redis_data:
+  neo4j_plugins:
   
