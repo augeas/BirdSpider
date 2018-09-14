@@ -5,9 +5,7 @@ ENV APOC_URI https://github.com/neo4j-contrib/neo4j-apoc-procedures/releases/dow
 ENV ALGO_VERSION 3.4.4.0
 ENV ALGO_URI https://github.com/neo4j-contrib/neo4j-graph-algorithms/releases/download/${ALGO_VERSION}/graph-algorithms-algo-${ALGO_VERSION}.jar
 
-RUN cd /var/lib/neo4j/plugins \
-  && wget $APOC_URI
+RUN cd /var/lib/neo4j/plugins && wget $APOC_URI
 
-RUN cd /var/lib/neo4j/plugins \
-  && wget $ALGO_URI
+RUN cd /var/lib/neo4j/plugins && wget $ALGO_URI
 
