@@ -11,9 +11,12 @@ except:
 
 uri = "bolt://neo4j:7687"
 
-try:
-    neoDb = GraphDatabase.driver(uri, auth=(environ['NEO_USER'], environ['NEO_PW']))
-except:
+neo_user = environ.get('NEO_USER', False)
+neo_pass = environ.get('NEO_PW', False)
+
+if neo_user and neo_pass:
+    neoDb = GraphDatabase.driver(uri, auth=(neo_user, neo_pass))
+else:
     neoDb = None
 
 solr_host = "birdspider_solr"
