@@ -18,7 +18,7 @@ from db_settings import get_neo_driver, cache
 # then that is the node you pick to scrape next
 # rephrase or rewrite?
 # actual number of relationships is less than the count attribute
-def nextFriends(latest=False, max_friends=2000, max_followers=2000, limit=20):
+def nextFriends(db, latest=False, max_friends=2000, max_followers=2000, limit=20):
     """ Return a list of non-supernode users who have fewer friend relationships than Twitter thinks they should."""
     desc = 'DESC' if latest else ''
 
@@ -28,7 +28,7 @@ def nextFriends(latest=False, max_friends=2000, max_followers=2000, limit=20):
         RETURN a.screen_name
         ORDER BY a.last_scraped {} LIMIT {}""".format(max_friends, max_followers, desc, limit)
 
-    with neoDb.session() as session:
+    with db.session() as session:
         with session.begin_transaction() as tx:
             result = tx.run(query)
             next_friends = [record.values()[0] for record in result]
@@ -36,7 +36,7 @@ def nextFriends(latest=False, max_friends=2000, max_followers=2000, limit=20):
     return next_friends
 
 
-def nextFollowers(latest=False, max_friends=2000, max_followers=2000, limit=20):
+def nextFollowers(db, latest=False, max_friends=2000, max_followers=2000, limit=20):
     """ Return a list of non-supernode users who have fewer follower relationships than Twitter thinks they should."""
     desc = ' DESC' if latest else ''
     query = """MATCH (b:twitter_user)-[:FOLLOWS]-(a:twitter_user) WITH a, COUNT(*) as c
@@ -45,7 +45,7 @@ def nextFollowers(latest=False, max_friends=2000, max_followers=2000, limit=20):
         RETURN a.screen_name
         ORDER BY a.last_scraped {} LIMIT {}""".format(max_followers, max_friends, desc, limit)
 
-    with neoDb.session() as session:
+    with db.session() as session:
         with session.begin_transaction() as tx:
             result = tx.run(query)
             next_followers = [record.values()[0] for record in result]
@@ -53,7 +53,7 @@ def nextFollowers(latest=False, max_friends=2000, max_followers=2000, limit=20):
     return next_followers
 
 
-def nextTweets(latest=False, max_friends=2000, max_followers=2000, limit=20, max_tweets=3000):
+def nextTweets(db, latest=False, max_friends=2000, max_followers=2000, limit=20, max_tweets=3000):
     """ Return a list of non-supernode users who have fewer tweets than Twitter thinks they should."""
     desc = ' DESC' if latest else ''
     query = """MATCH (a:twitter_user) WHERE NOT (a)-[:TWEETED]->(:tweet) WITH a, COUNT(*) as c
@@ -64,12 +64,10 @@ def nextTweets(latest=False, max_friends=2000, max_followers=2000, limit=20, max
 
     neoDb = get_neo_driver()
 
-    with neoDb.session() as session:
+    with db.session() as session:
         with session.begin_transaction() as tx:
             result = tx.run(query)
             next_tweets = [record.values()[0] for record in result]
-
-    neoDb.close()
 
     return next_tweets
 
@@ -95,7 +93,7 @@ def whoNext(job, latest=False):
     return victim_list[0]
 
 
-def nextNearest(user, job, max_friends=2000, max_followers=2000, limit=20, max_tweets=2000, test=False):
+def nextNearest(db, user, job, max_friends=2000, max_followers=2000, limit=20, max_tweets=2000, test=False):
     """Find the next user to retrieve friends, followers or tweets, closest to a given user."""
     cacheKey = '_'.join(['nextnearest', job, user])
     nextUserDump = cache.get(cacheKey).decode('utf-8')
@@ -139,14 +137,13 @@ def nextNearest(user, job, max_friends=2000, max_followers=2000, limit=20, max_t
 
     query = query_str
     try:
-        with neoDb.session() as session:
+        with db.session() as session:
             with session.begin_transaction() as tx:
                 result = tx.run(query)
                 next_users = [record.values()[0] for record in result]
     except:
         next_users = []
 
-    neoDb.close()
 
     if next_users:
         print('*** NEXT '+job+': '+', '.join(next_users)+' ***')

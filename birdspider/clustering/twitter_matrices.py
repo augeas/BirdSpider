@@ -3,7 +3,6 @@
 """ Adjacency matrices for various queries relating to Twitter. """
 import re
 
-from db_settings import get_neo_driver
 
 def twitterFofQuery(user):
     fofQuery = """MATCH (a:twitter_user {screen_name:'SCREEN_NAME'})-[:FOLLOWS]->(b:twitter_user) WITH b
@@ -17,13 +16,13 @@ def twitterTransFofQuery(user):
     RETURN DISTINCT b.screen_name,COLLECT(c.screen_name)"""
     return re.sub(r'SCREEN_NAME', user, fofQuery)
 
-def twitterMatrix(query):
+def twitterMatrix(db, query):
     """Run a Cypher query that returns pairs of Twitter screen_names lists of others to which they are linked."""
 
     def matrix_query_as_list(tx):
         return list(tx.run(query))
 
-    with neoDb.session() as session:
+    with db.session() as session:
         result = session.read_transaction(matrix_query_as_list)
 
     screen_names = [record[0] for record in result if record[0]]

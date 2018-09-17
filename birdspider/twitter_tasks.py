@@ -10,7 +10,7 @@ from celery import chain, group
 from celery.utils.log import get_task_logger
 
 from app import app
-from db_settings import cache
+from db_settings import get_neo_driver, cache
 from solr_tools import tweets2Solr
 from twitter_settings import *
 from twitter_tools.neo import  connections2Neo, tweetDump2Neo, users2Neo, setUserDefunct
@@ -45,7 +45,9 @@ def twitterCall(method_name, **kwargs):
 
 @app.task
 def pushRenderedTwits2Neo(twits):
-    users2Neo(twits)
+    db = get_neo_driver()
+    users2Neo(db, twits)
+    db.close()
 
 @app.task
 def pushTwitterUsers(twits):
@@ -58,8 +60,10 @@ def pushTwitterUsers(twits):
     for twit in twits:
         twit['last_scraped'] = rightNow
         
-    renderedTwits = [ renderTwitterUser(twit) for twit in twits ]
+    renderedTwits = [renderTwitterUser(twit) for twit in twits]
+    db = get_neo_driver()
     pushRenderedTwits2Neo.delay(renderedTwits)
+    db.close()
 
 @app.task
 def getTwitterUsers(users,credentials=False):
@@ -75,7 +79,9 @@ def getTwitterUsers(users,credentials=False):
 
 @app.task
 def pushRenderedTweets2Neo(user, tweetDump):
+    db = get_neo_driver()
     tweetDump2Neo(user, tweetDump)
+    db.close()
     
 @app.task
 def pushRenderedTweets2Solr(tweets):
@@ -96,7 +102,12 @@ def pushTweets(tweets, user, cacheKey=False):
     
     tweetDump = decomposeTweets(tweets) # Extract mentions, URLs, replies hashtags etc...
 
-    pushRenderedTweets2Neo.delay(user, tweetDump)
+    db = get_neo_driver()
+
+    pushRenderedTweets2Neo.delay(db, user, tweetDump)
+    
+    db.close()
+    
     for label in ['tweet', 'retweet', 'quotetweet']:
         pushRenderedTweets2Solr.delay([t[0] for t in tweetDump[label]])
 
@@ -155,7 +166,9 @@ def getTweets(user, maxTweets=3000, count=0, tweetId=0, cacheKey=False, credenti
 
 @app.task
 def pushRenderedConnections2Neo(user, renderedTwits, friends=True):
+    db = get_neo_driver()
     connections2Neo(user,renderedTwits,friends=friends)
+    db.close()
                         
 @app.task
 def pushTwitterConnections(twits, user, friends=True, cacheKey=False):
@@ -178,7 +191,9 @@ def pushTwitterConnections(twits, user, friends=True, cacheKey=False):
     
     if twits:
         rendered_twits = [renderTwitterUser(twit) for twit in twits]
+        db = get_neo_driver()
         pushRenderedConnections2Neo.delay(user, rendered_twits, friends=friends)
+        db.close()
 # These are the last Tweets, tell the scaper we're done.
     if cacheKey: # These are the last connections, tell the scaper we're done.
         cache.set(cacheKey, 'done')
@@ -313,12 +328,14 @@ def doUserScrape():
         logger.info('*** STOPPED USER SCRAPE ***') 
         return False
     
+    db = get_neo_driver()
+    
     user = cache.get('scrape_user').decode('utf-8')
     logger.info('*** SCRAPING USER: %s... ***' % (user,))
 
     this_friend = cache.get('scrape_friends').decode('utf-8')
     if (not this_friend) or this_friend == 'done':
-        next_friends = nextNearest(user, 'friends')
+        next_friends = nextNearest(db, user, 'friends')
         if next_friends:
             cache.set('scrape_friends', 'running')
             getTwitterConnections.delay(next_friends, cacheKey='scrape_friends')
@@ -327,7 +344,7 @@ def doUserScrape():
 
     this_follower = cache.get('scrape_followers').decode('utf-8')
     if (not this_follower) or this_follower == 'done':
-        next_followers = nextNearest(user,'followers')
+        next_followers = nextNearest(db, user,'followers')
         if next_followers:
             cache.set('scrape_followers','running')
             getTwitterConnections.delay(next_followers, friends=False, cacheKey='scrape_followers')
@@ -336,7 +353,7 @@ def doUserScrape():
 
     this_tweet = cache.get('scrape_tweets').decode('utf-8')
     if (not this_tweet) or this_tweet == 'done':
-        next_tweets = nextNearest(user, 'tweets')
+        next_tweets = nextNearest(db, user, 'tweets')
         if next_tweets:
             cache.set('scrape_tweets', 'running')
             getTweets.delay(next_tweets, maxTweets=1000, cacheKey='scrape_tweets')
@@ -350,3 +367,4 @@ def doUserScrape():
         cache.set('scrape_mode', '')
         logger.info('*** FINISHED SCRAPING USER: %s ***' % (user,))
 
+    db.close()

@@ -2,8 +2,6 @@
 from datetime import datetime
 import re
 
-from db_settings import get_neo_driver
-
 noSlash = re.compile(r'\\')
 
 
@@ -37,7 +35,7 @@ def mergeRel(src, rel, dest):
     return 'MERGE ({})-[:{}]->({})'.format('t'+src, rel, 't'+dest)
 
 
-def users2Neo(renderedTwits):
+def users2Neo(db, renderedTwits):
     """Store  a list of rendered Twitter users in Neo4J. No relationships are formed."""
     started = datetime.now()
     rightNow = started.isoformat()
@@ -50,22 +48,19 @@ def users2Neo(renderedTwits):
     query = '''UNWIND {data} AS d
         MERGE (x:twitter_user {screen_name: d.screen_name})
         SET x += d.props'''
-    
-    neoDb = get_neo_driver()
-    
-    with neoDb.session() as session:
+        
+    with db.session() as session:
         with session.begin_transaction() as tx:
             tx.run(query, data=data)
 
-    neoDb.close()
 
-def connections2Neo(user, renderedTwits, friends=True):
+def connections2Neo(db, user, renderedTwits, friends=True):
     """Add friend/follower relationships between an existing user node with screen_name <user> and
     the rendered Twitter users."""
     started = datetime.now()
     rightNow = started.isoformat()
         
-    users2Neo(renderedTwits)
+    users2Neo(db, renderedTwits)
     
     match = ("MATCH (t:twitter_user {{screen_name: '{}'}}),"
         +" (f:twitter_user {{screen_name: d.screen_name}})").format(user)
@@ -84,16 +79,13 @@ def connections2Neo(user, renderedTwits, friends=True):
     userNode = nodeRef(user, 'twitter_user', {'screen_name':user})
     update_query = '\n'.join([mergeNode(userNode, match=True), update])
 
-    neoDb = get_neo_driver()
-
-    with neoDb.session() as session:
+    with db.session() as session:
         with session.begin_transaction() as tx:
             tx.run(update_query)
             tx.run(query, data=data)
 
-    neoDb.close()
     
-def tweets2Neo(renderedTweets, label='tweet'):
+def tweets2Neo(db, renderedTweets, label='tweet'):
     #started = datetime.now()
     #rightNow = started.isoformat()
 
@@ -106,15 +98,12 @@ def tweets2Neo(renderedTweets, label='tweet'):
 
     query = '\n'.join(['UNWIND {data} AS d', merge, update])
     
-    neoDb = get_neo_driver()
-    
-    with neoDb.session() as session:
+    with db.session() as session:
         with session.begin_transaction() as tx:
             tx.run(query, data=data)
 
-    neoDb.close()
 
-def tweetActions(user, renderedTweets, label='tweet'):
+def tweetActions(db, user, renderedTweets, label='tweet'):
     actions = {'tweet':'TWEETED', 'retweet':'RETWEETED', 'quotetweet':'QUOTED'}
 
     match = ("MATCH (u:twitter_user {{screen_name: '{}'}})," +
@@ -127,15 +116,12 @@ def tweetActions(user, renderedTweets, label='tweet'):
     tweets = (t[-1] for t in renderedTweets)
     data = [{'id_str':tweet['id_str']} for tweet in tweets]
     
-    neoDb = get_neo_driver()
-    
-    with neoDb.session() as session:
+    with db.session() as session:
         with session.begin_transaction() as tx:
             tx.run(query, data=data)
 
-    neoDb.close()
 
-def multi_user_tweet_actions(tweet_user_dump):
+def multi_user_tweet_actions(db, tweet_user_dump):
     match = ("MATCH (u:twitter_user {screen_name: d.name}), " +
         "(t:tweet {id_str: d.id})")
     
@@ -146,15 +132,12 @@ def multi_user_tweet_actions(tweet_user_dump):
     data = [{'name':user['screen_name'], 'id':id_str} for id_str,user in
         tweet_user_dump.items()]
     
-    neoDb = get_neo_driver()
-    
-    with neoDb.session() as session:
+    with db.session() as session:
         with session.begin_transaction() as tx:
             tx.run(query, data=data)    
 
-    neoDb.close()
 
-def tweetLinks(links,src_label,dest_label,relation):
+def tweetLinks(db, links,src_label,dest_label,relation):
     match = ("MATCH (src:{} {{id_str: d.src_id_str}}),"
         +" (dest:{} {{id_str: d.dest_id_str}})").format(src_label,dest_label)
 
@@ -164,21 +147,16 @@ def tweetLinks(links,src_label,dest_label,relation):
 
     data = [{'src_id_str':src['id_str'], 'dest_id_str':dest['id_str']} for dest,src in links]
     
-    neoDb = get_neo_driver()
-    
-    with neoDb.session() as session:
-
+    with db.session() as session:
         with session.begin_transaction() as tx:
             tx.run(query, data=data)    
 
-
-    neoDb.close()
 
 entity_node_lables = {'hashtags': 'hashtag', 'urls':'url', 'media': 'media'}
 entity_ids = {'hashtags': 'text', 'urls': 'expanded_url', 'media': 'id_str'}
 
 
-def entities2neo(entities,entity_type):
+def entities2neo(db, entities,entity_type):
     merge = "MERGE (x:{} {{id: d.id}})".format(entity_node_lables[entity_type])
     
     update = "SET x += d.props"
@@ -188,13 +166,10 @@ def entities2neo(entities,entity_type):
 
     query = '\n'.join(['UNWIND {data} AS d', merge, update])
         
-    neoDb = get_neo_driver()
-        
-    with neoDb.session() as session:
+    with db.session() as session:
         with session.begin_transaction() as tx:
             tx.run(query, data=data)
 
-    neoDb.close()
 
 def entity_links(entities, relation, src_label, dest_label, src_prop, dest_prop):
     match = ("MATCH (src:{} {{{}:d.src}}), (dest:{} {{{}:d.dest}})").format(
@@ -216,7 +191,7 @@ def entity_links(entities, relation, src_label, dest_label, src_prop, dest_prop)
 
     neoDb.close()
 
-def tweetDump2Neo(user, tweetDump):
+def tweetDump2Neo(db, user, tweetDump):
     """Store a rendered set of tweets by a given user in Neo4J.
        
     Positional arguments:
@@ -227,17 +202,17 @@ def tweetDump2Neo(user, tweetDump):
     
     # user->[tweeted/RTed/quoted]->(tweet/RT/quoteTweet)
     for label in ['tweet', 'retweet', 'quotetweet']:
-        tweets2Neo(tweetDump[label], label=label)
-        tweetActions(user, tweetDump[label], label=label)
+        tweets2Neo(db, tweetDump[label], label=label)
+        tweetActions(db, user, tweetDump[label], label=label)
     
     # push original tweets from RTs/quotes
     for label in ['retweet', 'quotetweet']:
         tweets = [(tw[0],) for tw in tweetDump[label]]
-        tweets2Neo(tweets,label='tweet')
+        tweets2Neo(db, tweets,label='tweet')
     
     # (RT/quote)-[RETWEET_OF/QUOTE_OF]->(tweet)
-    tweetLinks(tweetDump['retweet'],'retweet','tweet','RETWEET_OF')
-    tweetLinks(tweetDump['quotetweet'],'quotetweet','tweet','QUOTE_OF')
+    tweetLinks(db, tweetDump['retweet'],'retweet','tweet','RETWEET_OF')
+    tweetLinks(db, tweetDump['quotetweet'],'quotetweet','tweet','QUOTE_OF')
 
     # push users of original tweets.
     users2Neo(tweetDump['users'].values())
@@ -246,22 +221,21 @@ def tweetDump2Neo(user, tweetDump):
     # mentions
     for label in ['tweet', 'retweet', 'quotetweet']:
         mentions = [m[1] for m in tweetDump['entities'][label]['user_mentions']]
-        users2Neo(mentions)
+        users2Neo(db, mentions)
         entities = tweetDump['entities'][label]['user_mentions']
-        entity_links(entities, 'MENTIONS', label, 'twitter_user', 'id_str', 'screen_name')
+        entity_links(db, entities, 'MENTIONS', label, 'twitter_user', 'id_str', 'screen_name')
 
     # hastags, urls and media
     for label in ['tweet', 'retweet', 'quotetweet']:
         for entity_type in ['hashtags', 'urls', 'media']:
             entities = [e[1] for e in tweetDump['entities'][label][entity_type]]
-            entities2neo(entities,entity_type)
+            entities2neo(db, entities,entity_type)
 
-        entity_links(tweetDump['entities'][label]['hashtags'], 'TAGGED', label, 'hashtag', 'id_str', 'text')
-        entity_links(tweetDump['entities'][label]['urls'], 'LINKS_TO', label, 'url', 'id_str', 'expanded_url')
-        entity_links(tweetDump['entities'][label]['media'], 'EMBEDS', label, 'media', 'id_str', 'id_str')
+        entity_links(db, tweetDump['entities'][label]['hashtags'], 'TAGGED', label, 'hashtag', 'id_str', 'text')
+        entity_links(db, tweetDump['entities'][label]['urls'], 'LINKS_TO', label, 'url', 'id_str', 'expanded_url')
+        entity_links(db, tweetDump['entities'][label]['media'], 'EMBEDS', label, 'media', 'id_str', 'id_str')
         
-
-
+        
 def setUserDefunct(user):
     try:
         userNode = next(neoDb.find('twitter_user', property_key='screen_name', property_value=user))
