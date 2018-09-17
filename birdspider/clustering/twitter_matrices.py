@@ -3,7 +3,7 @@
 """ Adjacency matrices for various queries relating to Twitter. """
 import re
 
-from db_settings import neoDb
+from db_settings import get_neo_driver
 
 def twitterFofQuery(user):
     fofQuery = """MATCH (a:twitter_user {screen_name:'SCREEN_NAME'})-[:FOLLOWS]->(b:twitter_user) WITH b

@@ -7,7 +7,7 @@ __author__ = 'Giles Richard Greenway'
 import json
 import redis
 from datetime import datetime, timedelta
-from db_settings import neoDb, cache
+from db_settings import get_neo_driver, cache
 
 
 #TODO: make sure this query really does the following
@@ -62,10 +62,14 @@ def nextTweets(latest=False, max_friends=2000, max_followers=2000, limit=20, max
         RETURN a.screen_name
         ORDER BY a.last_scraped {} LIMIT {}""".format(max_tweets, max_followers, max_friends, desc, limit)
 
+    neoDb = get_neo_driver()
+
     with neoDb.session() as session:
         with session.begin_transaction() as tx:
             result = tx.run(query)
             next_tweets = [record.values()[0] for record in result]
+
+    neoDb.close()
 
     return next_tweets
 
@@ -131,6 +135,8 @@ def nextNearest(user, job, max_friends=2000, max_followers=2000, limit=20, max_t
     if test:
         return query_str
 
+    neoDb = get_neo_driver()
+
     query = query_str
     try:
         with neoDb.session() as session:
@@ -139,6 +145,8 @@ def nextNearest(user, job, max_friends=2000, max_followers=2000, limit=20, max_t
                 next_users = [record.values()[0] for record in result]
     except:
         next_users = []
+
+    neoDb.close()
 
     if next_users:
         print('*** NEXT '+job+': '+', '.join(next_users)+' ***')

@@ -2,7 +2,7 @@
 from datetime import datetime
 import re
 
-from db_settings import neoDb
+from db_settings import get_neo_driver
 
 noSlash = re.compile(r'\\')
 
@@ -50,11 +50,14 @@ def users2Neo(renderedTwits):
     query = '''UNWIND {data} AS d
         MERGE (x:twitter_user {screen_name: d.screen_name})
         SET x += d.props'''
-        
+    
+    neoDb = get_neo_driver()
+    
     with neoDb.session() as session:
         with session.begin_transaction() as tx:
             tx.run(query, data=data)
 
+    neoDb.close()
 
 def connections2Neo(user, renderedTwits, friends=True):
     """Add friend/follower relationships between an existing user node with screen_name <user> and
@@ -81,12 +84,15 @@ def connections2Neo(user, renderedTwits, friends=True):
     userNode = nodeRef(user, 'twitter_user', {'screen_name':user})
     update_query = '\n'.join([mergeNode(userNode, match=True), update])
 
+    neoDb = get_neo_driver()
+
     with neoDb.session() as session:
         with session.begin_transaction() as tx:
             tx.run(update_query)
             tx.run(query, data=data)
 
-
+    neoDb.close()
+    
 def tweets2Neo(renderedTweets, label='tweet'):
     #started = datetime.now()
     #rightNow = started.isoformat()
@@ -99,10 +105,14 @@ def tweets2Neo(renderedTweets, label='tweet'):
     update = "SET x += d.props"
 
     query = '\n'.join(['UNWIND {data} AS d', merge, update])
-        
+    
+    neoDb = get_neo_driver()
+    
     with neoDb.session() as session:
         with session.begin_transaction() as tx:
             tx.run(query, data=data)
+
+    neoDb.close()
 
 def tweetActions(user, renderedTweets, label='tweet'):
     actions = {'tweet':'TWEETED', 'retweet':'RETWEETED', 'quotetweet':'QUOTED'}
@@ -117,9 +127,13 @@ def tweetActions(user, renderedTweets, label='tweet'):
     tweets = (t[-1] for t in renderedTweets)
     data = [{'id_str':tweet['id_str']} for tweet in tweets]
     
+    neoDb = get_neo_driver()
+    
     with neoDb.session() as session:
         with session.begin_transaction() as tx:
             tx.run(query, data=data)
+
+    neoDb.close()
 
 def multi_user_tweet_actions(tweet_user_dump):
     match = ("MATCH (u:twitter_user {screen_name: d.name}), " +
@@ -132,10 +146,13 @@ def multi_user_tweet_actions(tweet_user_dump):
     data = [{'name':user['screen_name'], 'id':id_str} for id_str,user in
         tweet_user_dump.items()]
     
+    neoDb = get_neo_driver()
+    
     with neoDb.session() as session:
         with session.begin_transaction() as tx:
             tx.run(query, data=data)    
 
+    neoDb.close()
 
 def tweetLinks(links,src_label,dest_label,relation):
     match = ("MATCH (src:{} {{id_str: d.src_id_str}}),"
@@ -147,11 +164,15 @@ def tweetLinks(links,src_label,dest_label,relation):
 
     data = [{'src_id_str':src['id_str'], 'dest_id_str':dest['id_str']} for dest,src in links]
     
+    neoDb = get_neo_driver()
+    
     with neoDb.session() as session:
 
         with session.begin_transaction() as tx:
             tx.run(query, data=data)    
 
+
+    neoDb.close()
 
 entity_node_lables = {'hashtags': 'hashtag', 'urls':'url', 'media': 'media'}
 entity_ids = {'hashtags': 'text', 'urls': 'expanded_url', 'media': 'id_str'}
@@ -167,10 +188,13 @@ def entities2neo(entities,entity_type):
 
     query = '\n'.join(['UNWIND {data} AS d', merge, update])
         
+    neoDb = get_neo_driver()
+        
     with neoDb.session() as session:
         with session.begin_transaction() as tx:
             tx.run(query, data=data)
 
+    neoDb.close()
 
 def entity_links(entities, relation, src_label, dest_label, src_prop, dest_prop):
     match = ("MATCH (src:{} {{{}:d.src}}), (dest:{} {{{}:d.dest}})").format(
@@ -182,11 +206,15 @@ def entity_links(entities, relation, src_label, dest_label, src_prop, dest_prop)
     
     data = [{'src':src, 'dest':dest[dest_prop]} for (src,dest) in entities]
     
+    neoDb = get_neo_driver()
+    
     with neoDb.session() as session:
 
         with session.begin_transaction() as tx:
             tx.run(query, data=data) 
 
+
+    neoDb.close()
 
 def tweetDump2Neo(user, tweetDump):
     """Store a rendered set of tweets by a given user in Neo4J.

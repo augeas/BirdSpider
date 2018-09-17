@@ -1,5 +1,5 @@
 from datetime import datetime
-from db_settings import neoDb
+from db_settings import get_neo_driver
 
 
 #[['picopony', 'Dino_Pony', 'SilkyRaven', 'hartclaudia1'],['squirmelia','crispjodi','kingseesar','augeas','victoria_dft','matthewchilton']]
@@ -17,6 +17,9 @@ def user_clusters_to_neo(labelled_clusters, seed_user, adjacency_criteria):
     # create cluster with relation 'clustered_by' linking it to Clustering
     # cluster<-member_of-clustering
     # cluster has one property, size
+    
+    neoDb = get_neo_driver()
+    
     cluster_match = "MATCH (a:clustering) WHERE ID(a) = {}".format(clustering_id)
     create = " CREATE (b:cluster {size: $size})-[:CLUSTERED_BY]->(a) RETURN id(b)"
     clustered_by_query = ' '.join([cluster_match, create])
@@ -34,6 +37,7 @@ def user_clusters_to_neo(labelled_clusters, seed_user, adjacency_criteria):
             with session.begin_transaction() as tx:
                 tx.run(relation_query, data=cluster)
 
+    neoDb.close()
 
 def clustering_to_neo(seed, seed_type, seed_id_label, adjacency_criteria):
     started = datetime.now()
@@ -44,6 +48,8 @@ def clustering_to_neo(seed, seed_type, seed_id_label, adjacency_criteria):
     create_query = '''UNWIND {data} AS d
         CREATE (a:Clustering {timestamp: d.timestamp, adjacency_criteria: d.adjacency_criteria})
         RETURN id(a)'''
+
+    neoDb = get_neo_driver()
 
     with neoDb.session() as session:
         with session.begin_transaction() as tx:
@@ -58,5 +64,7 @@ def clustering_to_neo(seed, seed_type, seed_id_label, adjacency_criteria):
     with neoDb.session() as session:
         with session.begin_transaction() as tx:
             tx.run(relation_query, data=seed)
+
+    neoDb.close()
 
     return clustering_id
