@@ -2,12 +2,12 @@
 
 from os import environ
 
-CONSUMER_KEY = environ['CONSUMER_KEY']
-CONSUMER_SECRET = environ['CONSUMER_SECRET']
-OAUTH_TOKEN = environ['OAUTH_TOKEN']
-OAUTH_TOKEN_SECRET = environ['OAUTH_TOKEN_SECRET']
+CONSUMER_KEY = environ.get('CONSUMER_KEY', None)
+CONSUMER_SECRET = environ.get('CONSUMER_SECRET', None)
+OAUTH_TOKEN = environ.get('OAUTH_TOKEN', None)
+OAUTH_TOKEN_SECRET = environ.get('OAUTH_TOKEN_SECRET', None)
 
-ACCESS_TOKEN = environ['ACCESS_TOKEN']
+ACCESS_TOKEN = environ.get('ACCESS_TOKEN', None)
 
 API_TIMEOUT = 900
 

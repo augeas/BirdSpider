@@ -5,7 +5,6 @@ services:
         context: .
         dockerfile: Dockerfile.neo4j
     container_name: birdspider_neo4j
-    network_mode: "bridge"
     ports:
      - "7474:7474"
      - "7473:7473"
@@ -34,16 +33,14 @@ services:
     image: redis
     volumes:
       - redis_data:/data
-  rabbitmq:
-    container_name: birdspider_mq
-    image: rabbitmq:alpine
+    ports:
+     - "6379:6379"    
   birdspider:
     build: .
     depends_on:
       - neo4j
       - solr
       - redis
-      - rabbitmq
     environment:
       - CONSUMER_KEY=${CONSUMER_KEY}
       - CONSUMER_SECRET=${CONSUMER_SECRET}
@@ -51,7 +48,8 @@ services:
       - OAUTH_TOKEN_SECRET=${OAUTH_TOKEN_SECRET}
       - ACCESS_TOKEN=${ACCESS_TOKEN}
       - NEO_USER=${NEO_USER}
-      - NEO_PW=${NEO_PW}    
+      - NEO_PW=${NEO_PW}
+      - REDIS_HOST=redis
 volumes:
   neo_data:
   solr_data:

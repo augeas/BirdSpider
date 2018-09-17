@@ -2,8 +2,9 @@
 
 # Licensed under the Apache License Version 2.0: http://www.apache.org/licenses/LICENSE-2.0.txt
 
-from celery import Celery
+from os import environ
 
+from celery import Celery
 
 # Rigmarole if you want proper docstrings for tasks.
 # https://github.com/celery/celery/issues/1636
@@ -37,8 +38,16 @@ from celery import Celery
 #    def __getattr__(self, attr):
 #        return getattr(self.func, attr)
 
-app = Celery('birdspider', broker='amqp://guest@rabbitmq//', backend='redis://redis:6379',
-	include=['twitter_tasks'])
+
+#app = Celery('birdspider', broker='amqp://guest@rabbitmq//', backend='redis://redis:6379',
+#        include=['twitter_tasks'])
+
+redis_host = environ.get('REDIS_HOST', 'localhost')
+
+app = Celery('birdspider', broker='redis://{}:6379'.format(redis_host),
+    backend='redis://{}:6379'.format(redis_host),
+    include=['twitter_tasks', 'clustering_tasks'])
+
 
 app.conf.update(
     CELERY_TASK_SERIALIZER = "json",

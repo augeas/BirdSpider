@@ -1,4 +1,6 @@
 from celery import chain, group
+
+from app import app
 from clustering.twitter_matrices import twitterMatrix, twitterTransFofQuery, twitterFofQuery
 from clustering.matrix_tools import clusterize, labelClusters
 from clustering.neo import user_clusters_to_neo

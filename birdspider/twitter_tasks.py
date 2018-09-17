@@ -131,7 +131,7 @@ def getTweets(user, maxTweets=3000, count=0, tweetId=0, cacheKey=False, credenti
         okay, result = api.get_user_timeline(**args)
 
         if okay:
-            print('*** TWITTER USER_TIMELINE: '+user+':'+str(tweetId)+' ***')
+            logger.info('*** TWITTER USER_TIMELINE: %s:%s ***' % (user, str(tweetId)))
             if result:
                 newCount = count + len(result)
                 if maxTweets:
@@ -234,7 +234,7 @@ def getTwitterConnections(user, friends=True, cursor=-1, credentials=False, cach
 @app.task
 def seedUser(user, scrape=False):
     """Retrieve the given Twitter user's account, and their timelines, friends and followers. Optionally, start scraping around them."""
-    print('*** SEEDING: '+user+' ***')
+    logger.info('*** SEEDING: %s ***' % (user,))
     if scrape:
         chain(getTwitterUsers.s([user]), getTwitterConnections.si(user), getTwitterConnections.si(user, friends=False),
               getTweets.si(user, maxTweets=1000), startUserScrape.si(user))()

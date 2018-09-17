@@ -4,10 +4,17 @@ from os import environ
 from neo4j.v1 import GraphDatabase
 import redis
 
-cache = redis.StrictRedis(host='redis')
+try:
+    cache = redis.StrictRedis(host='redis')
+except:
+    cache = None
 
 uri = "bolt://neo4j:7687"
-neoDb = GraphDatabase.driver(uri, auth=(environ['NEO_USER'], environ['NEO_PW']))
+
+try:
+    neoDb = GraphDatabase.driver(uri, auth=(environ['NEO_USER'], environ['NEO_PW']))
+except:
+    neoDb = None
 
 solr_host = "birdspider_solr"
 
