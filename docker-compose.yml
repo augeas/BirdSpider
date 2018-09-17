@@ -5,6 +5,7 @@ services:
         context: .
         dockerfile: Dockerfile.neo4j
     container_name: birdspider_neo4j
+    network_mode: "host"
     ports:
      - "7474:7474"
      - "7473:7473"

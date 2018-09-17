@@ -80,7 +80,7 @@ def getTwitterUsers(users,credentials=False):
 @app.task
 def pushRenderedTweets2Neo(user, tweetDump):
     db = get_neo_driver()
-    tweetDump2Neo(user, tweetDump)
+    tweetDump2Neo(db, user, tweetDump)
     db.close()
     
 @app.task
@@ -102,12 +102,8 @@ def pushTweets(tweets, user, cacheKey=False):
     
     tweetDump = decomposeTweets(tweets) # Extract mentions, URLs, replies hashtags etc...
 
-    db = get_neo_driver()
-
-    pushRenderedTweets2Neo.delay(db, user, tweetDump)
-    
-    db.close()
-    
+    pushRenderedTweets2Neo.delay(user, tweetDump)
+        
     for label in ['tweet', 'retweet', 'quotetweet']:
         pushRenderedTweets2Solr.delay([t[0] for t in tweetDump[label]])
 
@@ -167,7 +163,7 @@ def getTweets(user, maxTweets=3000, count=0, tweetId=0, cacheKey=False, credenti
 @app.task
 def pushRenderedConnections2Neo(user, renderedTwits, friends=True):
     db = get_neo_driver()
-    connections2Neo(user,renderedTwits,friends=friends)
+    connections2Neo(db, user,renderedTwits,friends=friends)
     db.close()
                         
 @app.task
@@ -191,9 +187,7 @@ def pushTwitterConnections(twits, user, friends=True, cacheKey=False):
     
     if twits:
         rendered_twits = [renderTwitterUser(twit) for twit in twits]
-        db = get_neo_driver()
         pushRenderedConnections2Neo.delay(user, rendered_twits, friends=friends)
-        db.close()
 # These are the last Tweets, tell the scaper we're done.
     if cacheKey: # These are the last connections, tell the scaper we're done.
         cache.set(cacheKey, 'done')
