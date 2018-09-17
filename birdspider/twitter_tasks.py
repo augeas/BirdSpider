@@ -33,12 +33,12 @@ def twitterCall(method_name, **kwargs):
     api = RatedTwitter()
     limit = api.can_we_do_that(method_name)
     if limit:
-        loggier.info('*** TWITTER RATE-LIMITED: %s ***' % method_name)
+        logger.info('*** TWITTER RATE-LIMITED: %s ***' % method_name)
         raise twitterCall.retry(exc=Exception('Twitter rate-limited',method_name), countdown = limit)
     else:
         okay, result = api.method_call(method_name, **kwargs)
         if okay:
-            loggier.info('*** TWITTER CALL: %s ***' % method_name)
+            logger.info('*** TWITTER CALL: %s ***' % method_name)
             return result
         else:
             assert False
