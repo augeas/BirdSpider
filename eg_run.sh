@@ -6,4 +6,4 @@ CONSUMER_SECRET=CONSUMER_SECRET \
 OAUTH_TOKEN=OAUTH_TOKEN \
 OAUTH_TOKEN_SECRET=OAUTH_TOKEN_SECRET \
 ACCESS_TOKEN=ACCESS_TOKEN \
-docker-compose run --rm birdspider /bin/sh
+docker-compose run --rm birdspider celery worker -l info -A app

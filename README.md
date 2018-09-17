@@ -32,7 +32,7 @@ CONSUMER_SECRET=CONSUMER_SECRET \
 OAUTH_TOKEN=OAUTH_TOKEN \
 OAUTH_TOKEN_SECRET=OAUTH_TOKEN_SECRET \
 ACCESS_TOKEN=ACCESS_TOKEN \
-docker-compose run --rm birdspider /bin/sh
+docker-compose run --rm birdspider celery worker -l info -A app
 
 ```
 
@@ -51,7 +51,7 @@ you can call the tasks by name. To get all the Tweets for the [@emfcamp](https:/
 ```python
 import celery
 app = Celery('birdspider', broker='redis://localhost:6379', backend='redis://localhost:6379')
-app.send_task('twitter_tasks.getTweets',args=['emfcamp'])   
+app.send_task('twitter_tasks.getTweets', args=['emfcamp'])   
 
 ```
 
