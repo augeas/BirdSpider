@@ -1,6 +1,8 @@
 
 from datetime import datetime
+import logging
 import re
+import time
 
 noSlash = re.compile(r'\\')
 
@@ -35,6 +37,35 @@ def mergeRel(src, rel, dest):
     return 'MERGE ({})-[:{}]->({})'.format('t'+src, rel, 't'+dest)
 
 
+def unwind_query(*clauses):
+    return '\n'.join(['UNWIND {data} AS d'] + list(clauses))
+
+
+def neo_tx(db, query, data=None):
+    with db.session() as session:
+        success = False
+        tries = 0
+        while not success and tries < 10:
+            try:
+                with session.begin_transaction() as tx:
+                    if data == None:
+                        tx.run(query)
+                    else:
+                        tx.run(query, data=data)
+                success = True
+            except:
+                logging.warn('*** Neo tx failed, attempt %d ***' % tries+1)
+                tries += 1
+                time.sleep(2)
+                
+    assert success
+                
+     
+def unwind_tx(db, data, *clauses):
+    query = unwind_query(*clauses)
+    neo_tx(db, query, data)
+     
+     
 def users2Neo(db, renderedTwits):
     """Store  a list of rendered Twitter users in Neo4J. No relationships are formed."""
     started = datetime.now()
@@ -43,16 +74,12 @@ def users2Neo(db, renderedTwits):
     for twit in renderedTwits:
         twit['last_scraped'] = rightNow
             
-    data = [{'screen_name': twit['screen_name'], 'props':twit} for twit in renderedTwits]
+    data = [{'screen_name': twit['screen_name'], 'props':twit}
+        for twit in renderedTwits]
     
-    query = '''UNWIND {data} AS d
-        MERGE (x:twitter_user {screen_name: d.screen_name})
-        SET x += d.props'''
-        
-    with db.session() as session:
-        with session.begin_transaction() as tx:
-            tx.run(query, data=data)
-
+    unwind_tx(db, data, 'MERGE (x:twitter_user {screen_name: d.screen_name})',
+        'SET x += d.props')
+    
 
 def connections2Neo(db, user, renderedTwits, friends=True):
     """Add friend/follower relationships between an existing user node with screen_name <user> and
@@ -79,10 +106,8 @@ def connections2Neo(db, user, renderedTwits, friends=True):
     userNode = nodeRef(user, 'twitter_user', {'screen_name':user})
     update_query = '\n'.join([mergeNode(userNode, match=True), update])
 
-    with db.session() as session:
-        with session.begin_transaction() as tx:
-            tx.run(update_query)
-            tx.run(query, data=data)
+    neo_tx(db, update_query)
+    neo_tx(db, query, data=data)
 
     
 def tweets2Neo(db, renderedTweets, label='tweet'):
@@ -96,11 +121,7 @@ def tweets2Neo(db, renderedTweets, label='tweet'):
     merge = "MERGE (x:{} {{id: d.id}})".format(label)
     update = "SET x += d.props"
 
-    query = '\n'.join(['UNWIND {data} AS d', merge, update])
-    
-    with db.session() as session:
-        with session.begin_transaction() as tx:
-            tx.run(query, data=data)
+    unwind_tx(db, data, merge, update)
 
 
 def tweetActions(db, user, renderedTweets, label='tweet'):
@@ -111,46 +132,34 @@ def tweetActions(db, user, renderedTweets, label='tweet'):
 
     merge = "MERGE (u)-[:{}]->(t)".format(actions[label])
 
-    query = '\n'.join(['UNWIND {data} AS d', match, merge])
-
     tweets = (t[-1] for t in renderedTweets)
     data = [{'id_str':tweet['id_str']} for tweet in tweets]
-    
-    with db.session() as session:
-        with session.begin_transaction() as tx:
-            tx.run(query, data=data)
 
+    unwind_tx(db, data, match, merge)
+    
 
 def multi_user_tweet_actions(db, tweet_user_dump):
     match = ("MATCH (u:twitter_user {screen_name: d.name}), " +
         "(t:tweet {id_str: d.id})")
     
     merge = "MERGE (u)-[:TWEETED]->(t)"
-    
-    query = '\n'.join(['UNWIND {data} AS d', match, merge])
-    
+        
     data = [{'name':user['screen_name'], 'id':id_str} for id_str,user in
         tweet_user_dump.items()]
     
-    with db.session() as session:
-        with session.begin_transaction() as tx:
-            tx.run(query, data=data)    
-
-
+    unwind_tx(db, data, match, merge)
+    
+   
 def tweetLinks(db, links,src_label,dest_label,relation):
     match = ("MATCH (src:{} {{id_str: d.src_id_str}}),"
         +" (dest:{} {{id_str: d.dest_id_str}})").format(src_label,dest_label)
 
     merge = "MERGE (src)-[:{}]->(dest)".format(relation)
 
-    query = '\n'.join(['UNWIND {data} AS d', match, merge])
-
     data = [{'src_id_str':src['id_str'], 'dest_id_str':dest['id_str']} for dest,src in links]
     
-    with db.session() as session:
-        with session.begin_transaction() as tx:
-            tx.run(query, data=data)    
-
+    unwind_tx(db, data, match, merge)
+       
 
 entity_node_lables = {'hashtags': 'hashtag', 'urls':'url', 'media': 'media'}
 entity_ids = {'hashtags': 'text', 'urls': 'expanded_url', 'media': 'id_str'}
@@ -164,11 +173,7 @@ def entities2neo(db, entities,entity_type):
     id_field = entity_ids[entity_type]
     data = [{'id': e[id_field], 'props': e} for e in entities]
 
-    query = '\n'.join(['UNWIND {data} AS d', merge, update])
-        
-    with db.session() as session:
-        with session.begin_transaction() as tx:
-            tx.run(query, data=data)
+    unwind_tx(db, data, merge, update)
 
 
 def entity_links(db, entities, relation, src_label, dest_label, src_prop, dest_prop):
@@ -177,15 +182,10 @@ def entity_links(db, entities, relation, src_label, dest_label, src_prop, dest_p
     
     merge = "MERGE (src)-[:{}]->(dest)".format(relation)
     
-    query = '\n'.join(['UNWIND {data} AS d', match, merge])
-    
     data = [{'src':src, 'dest':dest[dest_prop]} for (src,dest) in entities]
+
+    unwind_tx(db, data, match, merge)
     
-    with db.session() as session:
-
-        with session.begin_transaction() as tx:
-            tx.run(query, data=data) 
-
 
 def tweetDump2Neo(db, user, tweetDump):
     """Store a rendered set of tweets by a given user in Neo4J.

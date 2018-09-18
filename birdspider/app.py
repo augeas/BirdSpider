@@ -51,7 +51,7 @@ app = Celery('birdspider', broker='redis://{}:6379'.format(redis_host),
 
 app.conf.update(
     CELERY_TASK_SERIALIZER = "json",
-    CELERYD_CONCURRENCY = 1
+    CELERYD_CONCURRENCY = 4
 )
 
 if __name__ == '__main__':
