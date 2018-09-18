@@ -10,7 +10,7 @@ from datetime import datetime
 # indiv users have member of rel to clusters (member of cluster)
 # users are members of a clusters, clusters belong to a clustering session
 def user_clusters_to_neo(db, labelled_clusters, seed_user, adjacency_criteria):
-    clustering_id = clustering_to_neo(seed_user, 'twitter_user', 'screen_name', adjacency_criteria)
+    clustering_id = clustering_to_neo(db, seed_user, 'twitter_user', 'screen_name', adjacency_criteria)
 
     # create cluster with relation 'clustered_by' linking it to Clustering
     # cluster<-member_of-clustering
@@ -20,12 +20,12 @@ def user_clusters_to_neo(db, labelled_clusters, seed_user, adjacency_criteria):
     create = " CREATE (b:cluster {size: $size})-[:CLUSTERED_BY]->(a) RETURN id(b)"
     clustered_by_query = ' '.join([cluster_match, create])
     for cluster in labelled_clusters:
-        with neoDb.session() as session:
+        with db.session() as session:
             with session.begin_transaction() as tx:
                 cluster_id = tx.run(clustered_by_query, size=len(cluster)).single().value()
 
         # match screen_names to users, add relation 'member_of'
-        match = "MATCH (m:twitter_user {screen_name: d}), (c:cluster) WHERE ID(c) = {}".format(cluster_id)
+        match = "MATCH (m:twitter_user {{screen_name: d}}), (c:cluster) WHERE ID(c) = {}".format(cluster_id)
         # user-member_of->cluster
         merge = "MERGE (m)-[:MEMBER_OF]->(c)"
         relation_query = '\n'.join(['UNWIND {data} AS d', match, merge])
@@ -41,7 +41,7 @@ def clustering_to_neo(db, seed, seed_type, seed_id_label, adjacency_criteria):
     # push new node to neo4j
     clustering_data = {'timestamp': right_now, 'adjacency_criteria': adjacency_criteria}
     create_query = '''UNWIND {data} AS d
-        CREATE (a:Clustering {timestamp: d.timestamp, adjacency_criteria: d.adjacency_criteria})
+        CREATE (a:clustering {timestamp: d.timestamp, adjacency_criteria: d.adjacency_criteria})
         RETURN id(a)'''
 
 

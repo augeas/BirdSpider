@@ -61,9 +61,8 @@ def pushTwitterUsers(twits):
         twit['last_scraped'] = rightNow
         
     renderedTwits = [renderTwitterUser(twit) for twit in twits]
-    db = get_neo_driver()
     pushRenderedTwits2Neo.delay(renderedTwits)
-    db.close()
+
 
 @app.task
 def getTwitterUsers(users,credentials=False):
