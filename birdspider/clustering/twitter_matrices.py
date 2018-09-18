@@ -16,6 +16,9 @@ def twitterTransFofQuery(user):
     RETURN DISTINCT b.screen_name,COLLECT(c.screen_name)"""
     return re.sub(r'SCREEN_NAME', user, fofQuery)
 
+
+# TODO: rename to something indicating this could create any set of labels and matrix given correct sort of query?
+# although given birdspider is twitter specific may not be necessary to rename
 def twitterMatrix(db, query):
     """Run a Cypher query that returns pairs of Twitter screen_names lists of others to which they are linked."""
 
