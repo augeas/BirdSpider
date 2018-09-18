@@ -1,3 +1,4 @@
+NEO_HOST=neo4j \
 NEO_USER=neo4j \
 NEO_PW=birdspider \
 NEO_RAM=2G \

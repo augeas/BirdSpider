@@ -29,7 +29,10 @@ class RatedTwitter(object):
         """      
         
         # Have we recorded how many calls remain in the current window?
-        keyval = cache.get(self.handle+method_name).decode('utf-8')
+        try:
+            keyval = cache.get(self.handle+method_name).decode('utf-8')
+        except:
+            keyval = False
         # We've not made the call for these credentials. Assume all's well.
         if not keyval: 
             return 0

@@ -171,7 +171,7 @@ def entities2neo(db, entities,entity_type):
             tx.run(query, data=data)
 
 
-def entity_links(entities, relation, src_label, dest_label, src_prop, dest_prop):
+def entity_links(db, entities, relation, src_label, dest_label, src_prop, dest_prop):
     match = ("MATCH (src:{} {{{}:d.src}}), (dest:{} {{{}:d.dest}})").format(
     src_label,src_prop,dest_label,dest_prop)
     
@@ -181,15 +181,11 @@ def entity_links(entities, relation, src_label, dest_label, src_prop, dest_prop)
     
     data = [{'src':src, 'dest':dest[dest_prop]} for (src,dest) in entities]
     
-    neoDb = get_neo_driver()
-    
-    with neoDb.session() as session:
+    with db.session() as session:
 
         with session.begin_transaction() as tx:
             tx.run(query, data=data) 
 
-
-    neoDb.close()
 
 def tweetDump2Neo(db, user, tweetDump):
     """Store a rendered set of tweets by a given user in Neo4J.
@@ -215,8 +211,8 @@ def tweetDump2Neo(db, user, tweetDump):
     tweetLinks(db, tweetDump['quotetweet'],'quotetweet','tweet','QUOTE_OF')
 
     # push users of original tweets.
-    users2Neo(tweetDump['users'].values())
-    multi_user_tweet_actions(tweetDump['users'])
+    users2Neo(db, tweetDump['users'].values())
+    multi_user_tweet_actions(db, tweetDump['users'])
     
     # mentions
     for label in ['tweet', 'retweet', 'quotetweet']:

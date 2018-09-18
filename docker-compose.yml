@@ -48,6 +48,7 @@ services:
       - OAUTH_TOKEN=${OAUTH_TOKEN}
       - OAUTH_TOKEN_SECRET=${OAUTH_TOKEN_SECRET}
       - ACCESS_TOKEN=${ACCESS_TOKEN}
+      - NEO_HOST=${NEO_HOST}
       - NEO_USER=${NEO_USER}
       - NEO_PW=${NEO_PW}
       - REDIS_HOST=redis

@@ -9,7 +9,9 @@ try:
 except:
     cache = None
 
-uri = "bolt://neo4j:7687"
+neo_host = environ.get('NEO_HOST', 'localhost')
+
+uri = "bolt://{}:7687".format(neo_host)
 
 def get_neo_driver():
     neo_user = environ.get('NEO_USER', False)
