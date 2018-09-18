@@ -49,14 +49,14 @@ The crawler is controlled by a set of Celery tasks. Having installed celery,
 you can call the tasks by name. To get all the Tweets for the [@emfcamp](https://twitter.com/emfcamp) account:
 
 ```python
-import celery
+from celery import Celery
 app = Celery('birdspider', broker='redis://localhost:6379', backend='redis://localhost:6379')
 app.send_task('twitter_tasks.getTweets', args=['emfcamp'])   
 
 ```
 
 The tweets for the account will be visible in the Neo4j Browser when you expand the account's node by clicking on it.
-Find the node with the Cyper query:
+Find the node with the Cypher query:
 
 ```
 MATCH (n:twitter_user {screen_name: 'emfcamp'}) RETURN n
