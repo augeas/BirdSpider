@@ -66,4 +66,28 @@ MATCH (n:twitter_user {screen_name: 'emfcamp'}) RETURN n
 
 ![simple user query](https://raw.githubusercontent.com/augeas/BirdSpider/master/docs/img/emfcamp_query.png)
 
+### Starting a user scrape
 
+To start a user scrape, call the celery twitter_task seedUser with scrape='True'
+
+```python
+from celery import Celery
+app = Celery('birdspider', broker='redis://localhost:6379', backend='redis://localhost:6379')
+app.send_task('twitter_tasks.seedUser', args=['emfcamp', 'True'])
+
+```
+
+### Halting a running scrape
+
+A user scrape has a stopping condition within it, but you may sometimes wish to stop a scrape early.
+Scraping a user checks that the cache key user_scrape == 'true' to signal 'keep going'
+If you wish to halt a running scrape before it finishes, for the moment you should change this key to 'false'.
+A better interface for this is a TODO
+
+```python
+import redis
+# assuming redis is accessible on localhost, substitute hostname as appropriate
+cache = redis.StrictRedis(host='localhost')
+cache.get('user_scrape', 'false')
+
+```
