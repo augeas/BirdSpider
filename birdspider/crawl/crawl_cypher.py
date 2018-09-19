@@ -5,6 +5,7 @@ __author__ = 'Giles Richard Greenway'
 
 
 import json
+import logging
 import redis
 from datetime import datetime, timedelta
 from db_settings import get_neo_driver, cache
@@ -104,7 +105,7 @@ def nextNearest(db, user, job, max_friends=2000, max_followers=2000, limit=20, m
         except:
             next_users = []
     if next_users:
-        print('*** NEXT '+job+': '+', '.join(next_users)+' ***')
+        logging.info('*** NEXT '+job+': '+', '.join(next_users)+' ***')
         next_user = next_users.pop(0)
         cache.set(cacheKey, json.dumps(next_users))
         return next_user
@@ -128,12 +129,10 @@ def nextNearest(db, user, job, max_friends=2000, max_followers=2000, limit=20, m
         query_str += 'AND b.statuses_count > 0 AND n < b.statuses_count/2 AND n<{} '.format(max_tweets)
     query_str += 'RETURN b.screen_name ORDER BY b.{}_last_scraped LIMIT {}'.format(job, limit)
 
-    print('*** Looking for '+job+' ***')
+    logging.info('*** Looking for '+job+' ***')
 
     if test:
         return query_str
-
-    neoDb = get_neo_driver()
 
     query = query_str
     try:
@@ -144,13 +143,12 @@ def nextNearest(db, user, job, max_friends=2000, max_followers=2000, limit=20, m
     except:
         next_users = []
 
-
     if next_users:
-        print('*** NEXT '+job+': '+', '.join(next_users)+' ***')
+        logging.info('*** NEXT '+job+': '+', '.join(next_users)+' ***')
         next_user = next_users.pop(0)
         cache.set(cacheKey, json.dumps(next_users))
         return next_user
     else:
-        print('No more '+job+' for '+user)
+        logging.info('No more '+job+' for '+user)
 
     return False
