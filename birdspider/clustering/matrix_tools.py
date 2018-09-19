@@ -4,6 +4,7 @@
 
 from datetime import datetime
 
+import logging
 import networkx as nx
 import numpy as np
 
@@ -37,7 +38,7 @@ def clusterize(matrix,inflate=1.5):
         else:
             output += ' Converged in '+str((datetime.now()-start).seconds)+ ' seconds.'
             converged = True
-        print(output)
+        logging.info(output)
  
     labs = np.array(list(range(dim)))
   

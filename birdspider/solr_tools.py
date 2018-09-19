@@ -1,5 +1,6 @@
 
 import json
+import logging
 import requests
 
 from datetime import datetime
@@ -15,7 +16,7 @@ def tweets2Solr(tweets):
     resp = requests.post(update_url, headers={"Content-Type":"application/json"}, data=json_dump)
     howLong = (datetime.now() - started).seconds
     if resp.status_code != 200:
-        print("*** Can't push Solr docs... ***")
+        logging.warn("*** Can't push Solr docs... ***")
     else:
-        print('*** PUSHED '+str(len(tweets))+' TWEETS TO SOLR IN '+str(howLong)+'s ***')
+        logging.info('*** PUSHED %d TWEETS TO SOLR IN %ds ***' % (len(tweets),howLong))
 

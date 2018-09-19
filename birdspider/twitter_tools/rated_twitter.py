@@ -1,6 +1,7 @@
 
 from datetime import datetime
 import json
+import logging
 
 from twython import Twython, TwythonAuthError, TwythonRateLimitError, TwythonError
 from twython.endpoints import EndpointsMixin
@@ -29,7 +30,10 @@ class RatedTwitter(object):
         """      
         
         # Have we recorded how many calls remain in the current window?
-        keyval = cache.get(self.handle+method_name).decode('utf-8')
+        try:
+            keyval = cache.get(self.handle+method_name).decode('utf-8')
+        except:
+            keyval = False
         # We've not made the call for these credentials. Assume all's well.
         if not keyval: 
             return 0
@@ -60,26 +64,26 @@ class RatedTwitter(object):
         try: 
             method = getattr(self.twitter,method_name)
         except:
-            print('*** NO SUCH TWITTER METHOD: '+method_name+' ***')
+            logging.error('*** NO SUCH TWITTER METHOD: '+method_name+' ***')
             return (False,'no_such_method')
         
         # Call the method of the Twython object.
         try:
             result = (True,method(*args, **kwargs)) 
         except TwythonAuthError:
-            print('*** TWITTER METHOD 401: '+method_name+' ***')
+            logging.error('*** TWITTER METHOD 401: '+method_name+' ***')
             result = (False,'forbidden')
         except TwythonRateLimitError:
-            print('*** TWITTER METHOD LIMITED: '+method_name+' ***')
+            logging.error('*** TWITTER METHOD LIMITED: '+method_name+' ***')
             result = (False,'limited')
         except TwythonError as e:
             if str(e.error_code) == '404':
-                print('*** TWITTER METHOD 404: '+method_name+' ***')
+                logging.error('*** TWITTER METHOD 404: '+method_name+' ***')
                 result = (False,'404')
             else:
-                print('*** TWITTER METHOD FAILED: '+method_name+' ***')
+                logging.error('*** TWITTER METHOD FAILED: '+method_name+' ***')
                 result = (False,'unknown')
-            print(args)
+            logging.error(args)
 
         # Have we been told how many calls remain in the current window?
         try: 

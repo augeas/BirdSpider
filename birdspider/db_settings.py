@@ -9,15 +9,17 @@ try:
 except:
     cache = None
 
-uri = "bolt://neo4j:7687"
+neo_host = environ.get('NEO_HOST', 'localhost')
 
-neo_user = environ.get('NEO_USER', False)
-neo_pass = environ.get('NEO_PW', False)
+uri = "bolt://{}:7687".format(neo_host)
 
-if neo_user and neo_pass:
-    neoDb = GraphDatabase.driver(uri, auth=(neo_user, neo_pass))
-else:
-    neoDb = None
+def get_neo_driver():
+    neo_user = environ.get('NEO_USER', False)
+    neo_pass = environ.get('NEO_PW', False)
+    if neo_user and neo_pass:
+        return GraphDatabase.driver(uri, auth=(neo_user, neo_pass))
+    else:
+        return None
 
 solr_host = "birdspider_solr"
 
