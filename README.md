@@ -91,3 +91,30 @@ cache = redis.StrictRedis(host='localhost')
 cache.get('user_scrape', 'false')
 
 ```
+
+### Clustering around a twitter user
+
+
+```python
+from celery import Celery
+app = Celery('birdspider', broker='redis://localhost:6379', backend='redis://localhost:6379')
+app.send_task('clustering_tasks.cluster', args=['emfcamp', 'twitter_user', 'TransFoF'])
+
+```
+
+Cypher queries to view the clustering results:
+
+all clustering nodes: (clusters are members of the clustering run that created them)
+
+```
+MATCH (n:clustering) RETURN n
+
+```
+clustering for a given seed user:
+
+```
+MATCH p=(n:twitter_user {screen_name: 'Dino_Pony'})-[r:SEED_FOR]->() RETURN p LIMIT 25
+
+```
+
+
