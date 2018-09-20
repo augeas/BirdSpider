@@ -53,8 +53,12 @@ Now you can start the database and Celery worker:
 
 ## Usage
 
-The crawler is controlled by a set of Celery tasks. Having installed celery,
-you can call the tasks by name. To get all the Tweets for the [@emfcamp](https://twitter.com/emfcamp) account:
+
+The crawler is controlled by a set of Celery tasks. Before starting any tasks, you should verify that
+Neo4j is running by visiting the "NEO_HOST" host in a web Browser and logging in with the credentials
+specified in "run.sh".
+Having installed celery, you can call the tasks by name. To get all the Tweets for
+the [@emfcamp](https://twitter.com/emfcamp) account:
 
 ```python
 from celery import Celery
