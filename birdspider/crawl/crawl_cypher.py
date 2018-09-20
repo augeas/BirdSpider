@@ -19,7 +19,7 @@ from db_settings import get_neo_driver, cache
 # then that is the node you pick to scrape next
 # rephrase or rewrite?
 # actual number of relationships is less than the count attribute
-def nextFriends(db, latest=False, max_friends=5000, max_followers=5000, limit=20):
+def nextFriends(db, latest=False, max_friends=2000, max_followers=2000, limit=20):
     """ Return a list of non-supernode users who have fewer friend relationships than Twitter thinks they should."""
     desc = 'DESC' if latest else ''
 
@@ -37,7 +37,7 @@ def nextFriends(db, latest=False, max_friends=5000, max_followers=5000, limit=20
     return next_friends
 
 
-def nextFollowers(db, latest=False, max_friends=5000, max_followers=5000, limit=20):
+def nextFollowers(db, latest=False, max_friends=2000, max_followers=2000, limit=20):
     """ Return a list of non-supernode users who have fewer follower relationships than Twitter thinks they should."""
     desc = ' DESC' if latest else ''
     query = """MATCH (b:twitter_user)-[:FOLLOWS]-(a:twitter_user) WITH a, COUNT(*) as c
@@ -54,7 +54,7 @@ def nextFollowers(db, latest=False, max_friends=5000, max_followers=5000, limit=
     return next_followers
 
 
-def nextTweets(db, latest=False, max_friends=5000, max_followers=5000, limit=20, max_tweets=3000):
+def nextTweets(db, latest=False, max_friends=2000, max_followers=2000, limit=20, max_tweets=3000):
     """ Return a list of non-supernode users who have fewer tweets than Twitter thinks they should."""
     desc = ' DESC' if latest else ''
     query = """MATCH (a:twitter_user) WHERE NOT (a)-[:TWEETED]->(:tweet) WITH a, COUNT(*) as c
@@ -94,7 +94,7 @@ def whoNext(job, latest=False):
     return victim_list[0]
 
 
-def nextNearest(db, user, job, max_friends=5000, max_followers=5000, limit=20, max_tweets=2000, test=False):
+def nextNearest(db, user, job, max_friends=2000, max_followers=2000, limit=20, max_tweets=2000, test=False):
     """Find the next user to retrieve friends, followers or tweets, closest to a given user."""
     cacheKey = '_'.join(['nextnearest', job, user])
     nextUserDump = cache.get(cacheKey).decode('utf-8')
