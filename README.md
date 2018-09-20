@@ -2,6 +2,14 @@
 
 ## Getting Started
 
+### Minimum system requirements
+
+We recommend at least 4GB of RAM (at least 8GB, or better yet 16GB or more is recommended)
+Neo4j on its own requires a minimum of 2GB of RAM (16GB or better recommended) according to official documentation
+
+During test runs, simply bringing the full BirdSpider stack up with no tasks running used slightly over 1GB of RAM.
+This usage rose further when tasks were running.
+
 ### Clone the repo and build the containers:
 
 Make sure you have [Docker](https://docs.docker.com/install/) and [Docker Compose](https://docs.docker.com/compose/)
@@ -88,7 +96,7 @@ A better interface for this is a TODO
 import redis
 # assuming redis is accessible on localhost, substitute hostname as appropriate
 cache = redis.StrictRedis(host='localhost')
-cache.get('user_scrape', 'false')
+cache.set('user_scrape', 'false')
 
 ```
 
