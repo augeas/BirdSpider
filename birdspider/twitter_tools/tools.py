@@ -1,3 +1,4 @@
+# Licensed under the Apache License Version 2.0: http://www.apache.org/licenses/LICENSE-2.0.txt
 
 from datetime import datetime
 import re
@@ -15,9 +16,11 @@ tweetFields = ['text', 'in_reply_to_status_id', 'id', 'favorite_count', 'source'
     'in_reply_to_user_id_str', 'possibly_sensitive', 'lang','created_at', 'in_reply_to_status_id_str',
     'quoted_status_id'] + ['isotime', 'last_scraped']
 
+
 def twitterTime(t):
     """Return Twitter's time format as isoformat."""
-    return datetime.strptime(re.sub('[+\-][0-9]{4}\s','',t),'%a %b %d %X %Y').isoformat()
+    return datetime.strptime(re.sub('[+\-][0-9]{4}\s', '', t), '%a %b %d %X %Y').isoformat()
+
 
 def renderTwitterUser(user):
     """Return a serializable dictionary of relevant fields for a Twitter user."""
@@ -26,6 +29,7 @@ def renderTwitterUser(user):
     if user.get('created_at',False):
         twit['isotime'] = twitterTime(user['created_at'])    
     return twit
+
 
 def renderTweet(tweet, get_user=False):
     """Return a serializable dictionary of relevant fields for a tweet."""
@@ -73,24 +77,27 @@ def entityStore():
     ents['media'] = []
     return ents
 
+
 def replies(tweets):
     for t in tweets:
-        reply_id = t[0].get('in_reply_to_status_id',False)
+        reply_id = t[0].get('in_reply_to_status_id', False)
         if reply_id:
-            yield (t[0]['id'],reply_id)
+            yield (t[0]['id'], reply_id)
+
 
 def cleanMentions(entities):
     for m in entities['user_mentions']:
         m[1].pop('indices')
 
+
 def decomposeTweets(tweets):
     """Decompose a list of tweets returned by Twython into lists of rendered tweets, retweets, mentions, hastags, URLs and replies. Be sure to set trim_user=False and exclude_replies=False in get_user_timeline."""
-    allTweets = []
-    allRetweets = []
-    allQuoteTweets = []
-    allUsers = {}
+    all_tweets = []
+    all_retweets = []
+    all_quote_tweets = []
+    all_users = {}
     
-    allEntities = {key:entityStore() for key in ['tweet', 'retweet', 'quotetweet']}
+    all_entities = {key:entityStore() for key in ['tweet', 'retweet', 'quotetweet']}
     
     for tweet in tweets:
         
@@ -99,29 +106,29 @@ def decomposeTweets(tweets):
         
         if retweeted and not quoted_status:
             raw = retweeted
-            renderedTweet, rendered_user = renderTweet(raw, get_user=True)
-            renderedRetweet = renderTweet(tweet)
-            allRetweets.append((renderedTweet,renderedRetweet))
-            pushEntities(raw, allEntities['retweet'])
-            allUsers[renderedTweet['id_str']] = rendered_user
+            rendered_tweet, rendered_user = renderTweet(raw, get_user=True)
+            rendered_retweet = renderTweet(tweet)
+            all_retweets.append((rendered_tweet, rendered_retweet))
+            pushEntities(raw, all_entities['retweet'])
+            all_users[rendered_tweet['id_str']] = rendered_user
         
         if quoted_status and not retweeted:
             raw = quoted_status
-            renderedTweet, rendered_user = renderTweet(raw, get_user=True)
-            renderedQuoteTweet = renderTweet(tweet)
-            allQuoteTweets.append((renderedTweet,renderedQuoteTweet))
-            pushEntities(raw, allEntities['quotetweet'])
-            allUsers[renderedTweet['id_str']] = rendered_user
+            rendered_tweet, rendered_user = renderTweet(raw, get_user=True)
+            rendered_quote_tweet = renderTweet(tweet)
+            all_quote_tweets.append((rendered_tweet, rendered_quote_tweet))
+            pushEntities(raw, all_entities['quotetweet'])
+            all_users[rendered_tweet['id_str']] = rendered_user
         
         if not retweeted and not quoted_status:
-            renderedTweet = renderTweet(tweet)
-            allTweets.append((renderedTweet,))
-            pushEntities(tweet, allEntities['tweet'])
+            rendered_tweet = renderTweet(tweet)
+            all_tweets.append((rendered_tweet,))
+            pushEntities(tweet, all_entities['tweet'])
 
-    allReplies = {}
-    allReplies['tweet'] = list(replies(allTweets))
-    allReplies['retweet'] = list(replies(allRetweets))
-    allReplies['quotetweet'] = list(replies(allQuoteTweets))
+    all_replies = {}
+    all_replies['tweet'] = list(replies(all_tweets))
+    all_replies['retweet'] = list(replies(all_retweets))
+    all_replies['quotetweet'] = list(replies(all_quote_tweets))
     
-    return {'tweet':allTweets, 'retweet':allRetweets, 'quotetweet':allQuoteTweets,'entities':allEntities, 'replies':allReplies,
-    'users':allUsers}
+    return {'tweet': all_tweets, 'retweet': all_retweets, 'quotetweet': all_quote_tweets, 'entities': all_entities,
+            'replies': all_replies, 'users': all_users}
