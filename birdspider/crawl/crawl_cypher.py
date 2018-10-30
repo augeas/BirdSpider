@@ -94,9 +94,9 @@ def whoNext(job, latest=False):
     return victim_list[0]
 
 
-def nextNearest(db, user, job, max_friends=2000, max_followers=2000, limit=20, max_tweets=2000, test=False):
+def nextNearest(db, user, job, root_task, max_friends=2000, max_followers=2000, limit=20, max_tweets=2000, test=False):
     """Find the next user to retrieve friends, followers or tweets, closest to a given user."""
-    cacheKey = '_'.join(['nextnearest', job, user])
+    cacheKey = '_'.join(['nextnearest', job, user, root_task])
     nextUserDump = cache.get(cacheKey).decode('utf-8')
     next_users = False
     if nextUserDump:

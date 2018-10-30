@@ -15,12 +15,14 @@ __twitter_methods__ = [m for m in dir(EndpointsMixin) if not m.startswith('__')]
 class RatedTwitter(object):    
     """Wrapper around the Twython class that tracks whether API calls are rate-limited."""
 
-    def __init__(self, use_local=True):
+    def __init__(self, use_local=True, oauth1_token=None, oauth1_secret=None):
         if use_local:
-            self.twitter = Twython(CONSUMER_KEY,CONSUMER_SECRET,OAUTH_TOKEN,OAUTH_TOKEN_SECRET)
+            self.twitter = Twython(CONSUMER_KEY, CONSUMER_SECRET, OAUTH_TOKEN, OAUTH_TOKEN_SECRET)
             self.handle = 'local_'
+        elif oauth1_token and oauth1_secret:
+            self.twitter = Twython(CONSUMER_KEY, CONSUMER_SECRET, oauth1_token, oauth1_secret)
         else:
-            self.twitter = Twython(CONSUMER_KEY,access_token=ACCESS_TOKEN)
+            self.twitter = Twython(CONSUMER_KEY, CONSUMER_SECRET, access_token=ACCESS_TOKEN)
             self.handle = 'app_'
             
     def can_we_do_that(self, method_name):
@@ -124,7 +126,9 @@ def rated_method_factory(name):
 
 for name in __twitter_methods__:
     setattr(RatedTwitter, name+'_wait', rated_method_factory(name))
-                
+
+
+# appears to not be in use anywhere
 def getTwitterAPI(credentials=False):
     """Return a Twitter API object from oauth credentials, defaulting to those in db_settings."""
     if not credentials:
