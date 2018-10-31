@@ -99,7 +99,17 @@ To do this you will need to keep the task_id returned as the result of calling C
 result = app.send_task(task_name,args=[arg0,arg1..., argn])
 task_id = result.task_id
 
-A better interface for this is a TODO
+this can now be called as a celery task
+
+```python
+from celery import Celery
+app = Celery('birdspider', broker='redis://localhost:6379', backend='redis://localhost:6379')
+task_id = 'id of the task you wish to stop here'
+app.send_task('twitter_tasks.stop_scrape', args=[task_id])
+
+```
+
+this can also be done by directly editing th cache keys in redis
 
 ```python
 import redis

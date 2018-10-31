@@ -389,3 +389,14 @@ def doUserScrape(self, credentials=False):
         logger.info('*** FINISHED SCRAPING USER: %s ***' % (user,))
 
     db.close()
+
+
+# currently does simplistic cache value based halt. The effect is that the next time round on the loop, the
+# executing scrape will test for keep going and see 'false' instead of true and stop gracefully at that point.
+@app.task(name='twitter_tasks.stop_scrape', bind=True)
+def stop_scrape(self, task_id):
+    '''Stop an excuting scrape on the next loop.'''
+    scrape_mode = cache.get('scrape_mode_' + task_id)
+    if scrape_mode:
+        scrape_mode = scrape_mode.decode('utf-8')
+        cache.set(scrape_mode + '_scrape_' + task_id, 'false')
