@@ -15,15 +15,20 @@ __twitter_methods__ = [m for m in dir(EndpointsMixin) if not m.startswith('__')]
 class RatedTwitter(object):    
     """Wrapper around the Twython class that tracks whether API calls are rate-limited."""
 
-    def __init__(self, use_local=True, oauth1_token=None, oauth1_secret=None):
-        if use_local:
-            self.twitter = Twython(CONSUMER_KEY, CONSUMER_SECRET, OAUTH_TOKEN, OAUTH_TOKEN_SECRET)
-            self.handle = 'local_'
-        elif oauth1_token and oauth1_secret:
+    def __init__(self, use_app=True, credentials=False):
+        if credentials:
+            oauth1_token = credentials.get('oauth1_token')
+            oauth1_secret = credentials.get('oauth1_secret')
+            logging.info("*** Calls to Twitter APIs will use user provided OAUTH1 user authentication token and secret ***")
             self.twitter = Twython(CONSUMER_KEY, CONSUMER_SECRET, oauth1_token, oauth1_secret)
-        else:
+        elif use_app:
+            logging.info("*** Calls to Twitter APIs will use user provided OAUTH2 application authentication ***")
             self.twitter = Twython(CONSUMER_KEY, CONSUMER_SECRET, access_token=ACCESS_TOKEN)
             self.handle = 'app_'
+        else:   # TODO handle this choice better
+            logging.info("*** Calls to Twitter APIs will use preconfigured OAUTH1 user authentication token and secret ***")
+            self.twitter = Twython(CONSUMER_KEY, CONSUMER_SECRET, OAUTH_TOKEN, OAUTH_TOKEN_SECRET)
+            self.handle = 'local_'
             
     def can_we_do_that(self, method_name):
         """Check whether a given API call is rate-limited, return the estimated time to wait in seconds.
@@ -65,7 +70,7 @@ class RatedTwitter(object):
         
         # Does Twython even know how to do that?
         try: 
-            method = getattr(self.twitter,method_name)
+            method = getattr(self.twitter, method_name)
         except:
             logging.error('*** NO SUCH TWITTER METHOD: '+method_name+' ***')
             return (False,'no_such_method')
