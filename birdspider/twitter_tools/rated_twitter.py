@@ -22,8 +22,8 @@ class RatedTwitter(object):
             logging.info("*** Calls to Twitter APIs will use user provided OAUTH1 user authentication token and secret ***")
             self.twitter = Twython(CONSUMER_KEY, CONSUMER_SECRET, oauth1_token, oauth1_secret)
         elif use_app:
-            logging.info("*** Calls to Twitter APIs will use user provided OAUTH2 application authentication ***")
-            self.twitter = Twython(CONSUMER_KEY, CONSUMER_SECRET, access_token=ACCESS_TOKEN)
+            logging.info("*** Calls to Twitter APIs will use preconfigured OAUTH2 application authentication ***")
+            self.twitter = Twython(CONSUMER_KEY, access_token=ACCESS_TOKEN, oauth_version=2)
             self.handle = 'app_'
         else:   # TODO handle this choice better
             logging.info("*** Calls to Twitter APIs will use preconfigured OAUTH1 user authentication token and secret ***")
