@@ -30,7 +30,7 @@ def twitterCall(self, method_name, credentials=False, **kwargs):
         args -- a dicionary of keyword arguments
         
     """
-    api = RatedTwitter(credentials)
+    api = RatedTwitter(credentials=credentials)
     limit = api.can_we_do_that(method_name)
     if limit:
         logger.info('*** TWITTER RATE-LIMITED: %s ***' % method_name)
@@ -133,7 +133,7 @@ def getTweets(self, user, maxTweets=3000, count=0, tweetId=0, cacheKey=False, cr
     tweetId -- The maximum tweet ID to retrieve, set when the task calls itself
     
     """
-    api = RatedTwitter(credentials)
+    api = RatedTwitter(credentials=credentials)
     limit = api.get_user_timeline_wait()
     if limit:
         logger.info('*** TWITTER RATE-LIMITED: statuses.user_timeline: %s:%d  ***' % (user, str(count)))
@@ -218,7 +218,7 @@ def getTwitterConnections(self, user, friends=True, cursor=-1, credentials=False
     cacheKey -- a Redis key that identifies an on-going task to grab a user's friends or followers
     cursor -- Id of the next block of connections to retrieve, set when the task calls itself
     """
-    api = RatedTwitter(credentials)
+    api = RatedTwitter(credentials=credentials)
     if friends:
         method = api.get_friends_list
         limit = api.get_friends_list_wait()
