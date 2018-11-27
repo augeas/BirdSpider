@@ -7,6 +7,7 @@ __author__ = 'Giles Richard Greenway'
 from datetime import datetime
 
 from celery import chain, group
+from celery.task.control import revoke
 from celery.utils.log import get_task_logger
 
 from app import app
@@ -15,6 +16,7 @@ from solr_tools import tweets2Solr
 from twitter_settings import *
 from twitter_tools.neo import  connections2Neo, tweetDump2Neo, users2Neo, setUserDefunct
 from twitter_tools.rated_twitter import RatedTwitter
+from twitter_tools.streaming_twitter import StreamingTwitter
 from twitter_tools.tools import renderTwitterUser, decomposeTweets
 from crawl.crawl_cypher import nextNearest, whoNext
 
@@ -38,7 +40,7 @@ def twitterCall(self, method_name, credentials=False, **kwargs):
     else:
         okay, result = api.method_call(method_name, **kwargs)
         if okay:
-            logger.info('*** TWITTER CALL: %s ***' % method_name)
+            logger.info('*** TWITTER CALL: %s  suceeded***' % method_name)
             return result
         else:
             assert False
@@ -51,17 +53,18 @@ def pushRenderedTwits2Neo(self, twits):
     db.close()
 
 
-@app.task(name='twitter_tasks.pushTwitterUsers')
+@app.task(name='twitter_tasks.pushTwitterUsers', bind=True)
 def pushTwitterUsers(self, twits):
     """Store Twitter users returned by a Twitter API call in Neo4J.
     
     Positional arguments:
     twits -- a list of Twitter users as returned by Twython
     """
+    logger.info('***Push twitter users to neo ***')
     rightNow = datetime.now().isoformat()
     for twit in twits:
         twit['last_scraped'] = rightNow
-        
+        logger.info('***Push twitter user: ' + twit['screen_name'] + ' ***')
     renderedTwits = [renderTwitterUser(twit) for twit in twits]
     pushRenderedTwits2Neo.delay(renderedTwits)
 
@@ -75,7 +78,103 @@ def getTwitterUsers(self, users, credentials=False):
     
     """
     userList = ','.join(users)
+    logger.info('***Getting twitter users: ' + userList + ' ***')
     chain(twitterCall.s('lookup_user', credentials, **{'screen_name': userList}), pushTwitterUsers.s())()
+
+
+@app.task(name='twitter_tasks.stream_filter', bind=True)
+def start_stream(self, filter_terms=False, follow=False, credentials=False, **kwargs):
+
+    # TODO: decide how much of what is on the filter/follow request to log
+    logger.info('***Starting twitter filter stream***')
+    # TODO one of filter_terms or follow is required, return error if neither present
+    # start the stream
+    stream_task = stream_filter.delay(filter_terms, follow, credentials)
+    cache.set("stream_id_" + self.request.id, stream_task.id)
+
+@app.task(name='twitter_tasks.stream_filter', bind=True)
+def stop_stream(self, task_id):
+
+    # stop the stream running in the stream started by the given task id
+    stream_id = cache.get("stream_id_" + task_id)
+    logger.info('***Stopping twitter filter streamer in task id: '  + stream_id + ' ***')
+    revoke(stream_id, terminate=True)
+    # clean up the cache
+
+
+@app.task(name='twitter_tasks.stream_filter', bind=True)
+def stream_filter(self, filter_terms=False, follow=False, credentials=False, **kwargs):
+
+    logger.info('***Creating twitter filter streamer in task id: '  + self.request.id + ' ***')
+    # TODO one of filter_terms or follow is required, return error if neither present
+    cache.set("stream_filter_" + self.request.id, filter_terms)
+    cache.set("stream_follow_" + self.request.id, follow)
+
+    streamer = StreamingTwitter(credentials=credentials, **kwargs)
+    streamer.stream(filter=filter, follow=follow)
+
+
+@app.task(name='twitter_tasks.push_stream_results', bind=True)
+def push_stream_results(self, results):
+
+    logger.info('***Push twitter filter stream results***')
+    for tweet in results:
+        pushTwitterUsers([tweet['user']])
+        pushTweets(tweet['user']['screen_name'], [tweet])
+
+
+@app.task(name='twitter_tasks.search', bind=True)
+def search(self, query_terms, result_type='mixed', page_size=100, lang='en', tweet_id=False, maxTweets=False, count=0, credentials=False):
+
+    logger.info('***Starting TWITTER search ***')
+    api = RatedTwitter(credentials=credentials)
+    limit = api.search_wait()
+    if limit:
+        logger.info('*** TWITTER RATE-LIMITED: search starts with: %s:%d  ***' % (query_terms[0], str(count)))
+        raise search.retry(countdown=limit)
+    else:
+        query = {'q': query_terms,
+                 'result_type': result_type,
+                 'count': page_size,
+                 'lang': lang,
+                 }
+        if tweetId:
+            query['max_id'] = tweetId
+
+        okay, result = api.search(**query)
+
+        if okay:
+            logger.info('*** TWITTER search starts with: %s:%s ***' % (query_terms[0], str(tweetId)))
+            if result:
+                push_search_results.delay(result)
+                newCount = count + len(result['statuses'])
+                if maxTweets:
+                    if newCount > maxTweets: # No need for the task to call itself again.
+                        return
+
+                try:
+                    # Parse the data returned to get max_id to be passed in consequent call.
+                    next_results_url_params = result['search_metadata']['next_results']
+                    next_max_id = next_results_url_params.split('max_id=')[1].split('&')[0]
+
+                    # Not done yet, the task calls itself with an updated count and tweetId.
+                    search.delay(query_terms, maxTweets=maxTweets, count=newCount, tweet_id=next_max_id,
+                                 result_type=result_type, page_size=page_size, lang=lang, credentials=credentials)
+                # except:  #do we have anything we want in the except clause if there is not a next batch of tweets?
+
+        else:
+            if result == 'limited':
+                raise search.retry(countdown=api.search_wait())
+
+
+@app.task(name='twitter_tasks.push_search_results', bind=True)
+def push_search_results(self, search_results, cacheKey=False):
+
+    statuses = search_results['statuses']
+
+    for tweet in statuses:
+        pushTwitterUsers([tweet['user']])
+        pushTweets(tweet['user']['screen_name'], [tweet])
 
 
 @app.task(name='twitter_tasks.pushRenderedTweets2Neo', bind=True)
@@ -102,8 +201,7 @@ def pushTweets(self, tweets, user, cacheKey=False):
     cacheKey -- a Redis key that identifies an on-going task to grab a user's timeline
     
     """
-    logger.info('Executing pushTweets task id {0.id}, args: {0.args!r} kwargs: {0.kwargs!r}'.format(self.request))
-    logger.info('task parent id {0.parent_id}, root id {0.root_id}'.format(self.request))
+    logger.info('Executing pushTweets task id {0.id}, task parent id {0.parent_id}, root id {0.root_id}'.format(self.request))
 
     tweetDump = decomposeTweets(tweets)  # Extract mentions, URLs, replies hashtags etc...
 
@@ -112,13 +210,13 @@ def pushTweets(self, tweets, user, cacheKey=False):
     for label in ['tweet', 'retweet', 'quotetweet']:
         pushRenderedTweets2Solr.delay([t[0] for t in tweetDump[label]])
 
-    if cacheKey: # These are the last Tweets, tell the scaper we're done.
+    if cacheKey: # These are the last Tweets, tell the scraper we're done.
         cache.set(cacheKey, 'done')
         logger.info('*** %s: DONE WITH TWEETS ***' % user) 
 
 
 @app.task(name='twitter_tasks.getTweets', bind=True)
-def getTweets(self, user, maxTweets=3000, count=0, tweetId=0, cacheKey=False, credentials=False):
+def getTweets(self, user, maxTweets=3000, hals=False):
     logger.info('Executing getTweets task id {0.id}, args: {0.args!r} kwargs: {0.kwargs!r}'.format(self.request))
     logger.info('task parent id {0.parent_id}, root id {0.root_id}'.format(self.request))
     """Get tweets from the timeline of the given user, push them to Neo4J.
@@ -200,8 +298,8 @@ def pushTwitterConnections(self, twits, user, friends=True, cacheKey=False):
     if twits:
         rendered_twits = [renderTwitterUser(twit) for twit in twits]
         pushRenderedConnections2Neo.delay(user, rendered_twits, friends=friends)
-# These are the last Tweets, tell the scaper we're done.
-    if cacheKey:  # These are the last connections, tell the scaper we're done.
+
+    if cacheKey:  # These are the last connections, tell the scraper we're done.
         cache.set(cacheKey, 'done')
         logger.info('*** %s: DONE WITH %s ***' % (user, job))
 
