@@ -82,17 +82,18 @@ def getTwitterUsers(self, users, credentials=False):
     chain(twitterCall.s('lookup_user', credentials, **{'screen_name': userList}), pushTwitterUsers.s())()
 
 
-@app.task(name='twitter_tasks.stream_filter', bind=True)
-def start_stream(self, filter_terms=False, follow=False, credentials=False, **kwargs):
+@app.task(name='twitter_tasks.start_stream', bind=True)
+def start_stream(self, filter_terms=False, follow=False, credentials=False, track=None):
 
     # TODO: decide how much of what is on the filter/follow request to log
-    logger.info('***Starting twitter filter stream***')
+    logger.info('***Starting twitter filter stream***' + track)
     # TODO one of filter_terms or follow is required, return error if neither present
     # start the stream
-    stream_task = stream_filter.delay(filter_terms, follow, credentials)
+    stream_task = stream_filter.delay(credentials, track=track)
     cache.set("stream_id_" + self.request.id, stream_task.id)
 
-@app.task(name='twitter_tasks.stream_filter', bind=True)
+
+@app.task(name='twitter_tasks.stop_stream', bind=True)
 def stop_stream(self, task_id):
 
     # stop the stream running in the stream started by the given task id
@@ -103,15 +104,12 @@ def stop_stream(self, task_id):
 
 
 @app.task(name='twitter_tasks.stream_filter', bind=True)
-def stream_filter(self, filter_terms=False, follow=False, credentials=False, **kwargs):
+def stream_filter(self, credentials=False, retry_count=None, chunk_size=1, track=None):
 
-    logger.info('***Creating twitter filter streamer in task id: '  + self.request.id + ' ***')
-    # TODO one of filter_terms or follow is required, return error if neither present
-    cache.set("stream_filter_" + self.request.id, filter_terms)
-    cache.set("stream_follow_" + self.request.id, follow)
+    logger.info('***Creating twitter filter streamer in task id: ' + self.request.id + ' ***')
 
-    streamer = StreamingTwitter(credentials=credentials, **kwargs)
-    streamer.stream(filter=filter, follow=follow)
+    streamer = StreamingTwitter(credentials=credentials, retry_count=retry_count, chunk_size=chunk_size)
+    streamer.statuses.filter(track=track)
 
 
 @app.task(name='twitter_tasks.push_stream_results', bind=True)
@@ -124,7 +122,7 @@ def push_stream_results(self, results):
 
 
 @app.task(name='twitter_tasks.search', bind=True)
-def search(self, query_terms, result_type='mixed', page_size=100, lang='en', tweet_id=False, maxTweets=False, count=0, credentials=False):
+def search(self, query_terms, result_type='mixed', page_size=100, lang='en', tweet_id=0, maxTweets=False, count=0, credentials=False):
 
     logger.info('***Starting TWITTER search ***')
     api = RatedTwitter(credentials=credentials)
@@ -138,13 +136,13 @@ def search(self, query_terms, result_type='mixed', page_size=100, lang='en', twe
                  'count': page_size,
                  'lang': lang,
                  }
-        if tweetId:
-            query['max_id'] = tweetId
+        if tweet_id:
+            query['max_id'] = tweet_id
 
         okay, result = api.search(**query)
 
         if okay:
-            logger.info('*** TWITTER search starts with: %s:%s ***' % (query_terms[0], str(tweetId)))
+            logger.info('*** TWITTER search starts with: %s:%s ***' % (query_terms[0], str(tweet_id)))
             if result:
                 push_search_results.delay(result)
                 newCount = count + len(result['statuses'])
@@ -160,8 +158,8 @@ def search(self, query_terms, result_type='mixed', page_size=100, lang='en', twe
                     # Not done yet, the task calls itself with an updated count and tweetId.
                     search.delay(query_terms, maxTweets=maxTweets, count=newCount, tweet_id=next_max_id,
                                  result_type=result_type, page_size=page_size, lang=lang, credentials=credentials)
-                # except:  #do we have anything we want in the except clause if there is not a next batch of tweets?
-
+                except:  #do we have anything we want in the except clause if there is not a next batch of tweets?
+                    return
         else:
             if result == 'limited':
                 raise search.retry(countdown=api.search_wait())
@@ -216,7 +214,7 @@ def pushTweets(self, tweets, user, cacheKey=False):
 
 
 @app.task(name='twitter_tasks.getTweets', bind=True)
-def getTweets(self, user, maxTweets=3000, hals=False):
+def getTweets(self, user, maxTweets=3000,  count=0, tweetId=0, cacheKey=False, credentials=False):
     logger.info('Executing getTweets task id {0.id}, args: {0.args!r} kwargs: {0.kwargs!r}'.format(self.request))
     logger.info('task parent id {0.parent_id}, root id {0.root_id}'.format(self.request))
     """Get tweets from the timeline of the given user, push them to Neo4J.
