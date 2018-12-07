@@ -83,13 +83,12 @@ def getTwitterUsers(self, users, credentials=False):
 
 
 @app.task(name='twitter_tasks.start_stream', bind=True)
-def start_stream(self, filter_terms=False, follow=False, credentials=False, track=None):
+def start_stream(self, track=None, follow=False, credentials=False):
 
-    # TODO: decide how much of what is on the filter/follow request to log
-    logger.info('***Starting twitter filter stream***' + track)
+    logger.info('***Starting twitter filter stream***')
     # TODO one of filter_terms or follow is required, return error if neither present
     # start the stream
-    stream_task = stream_filter.delay(credentials, track=track)
+    stream_task = stream_filter.delay(credentials=credentials, track=track)
     cache.set("stream_id_" + self.request.id, stream_task.id)
 
 
@@ -99,16 +98,16 @@ def stop_stream(self, task_id):
     # stop the stream running in the stream started by the given task id
     stream_id = cache.get("stream_id_" + task_id)
     logger.info('***Stopping twitter filter streamer in task id: '  + stream_id + ' ***')
-    revoke(stream_id, terminate=True)
+    cache.set('stream_' + stream_id + '_connected', False)
     # clean up the cache
 
 
 @app.task(name='twitter_tasks.stream_filter', bind=True)
-def stream_filter(self, credentials=False, retry_count=None, chunk_size=1, track=None):
+def stream_filter(self, credentials=False, retry_count=None, track=None):
 
     logger.info('***Creating twitter filter streamer in task id: ' + self.request.id + ' ***')
 
-    streamer = StreamingTwitter(credentials=credentials, retry_count=retry_count, chunk_size=chunk_size)
+    streamer = StreamingTwitter(credentials=credentials, retry_count=retry_count, stream_id=self.request.id)
     streamer.statuses.filter(track=track)
 
 
@@ -117,8 +116,8 @@ def push_stream_results(self, results):
 
     logger.info('***Push twitter filter stream results***')
     for tweet in results:
-        pushTwitterUsers([tweet['user']])
-        pushTweets(tweet['user']['screen_name'], [tweet])
+        pushTwitterUsers.delay([tweet['user']])
+        pushTweets.delay([tweet], tweet['user']['screen_name'])
 
 
 @app.task(name='twitter_tasks.search', bind=True)
@@ -171,8 +170,8 @@ def push_search_results(self, search_results, cacheKey=False):
     statuses = search_results['statuses']
 
     for tweet in statuses:
-        pushTwitterUsers([tweet['user']])
-        pushTweets(tweet['user']['screen_name'], [tweet])
+        pushTwitterUsers.delay([tweet['user']])
+        pushTweets.delay([tweet], tweet['user']['screen_name'])
 
 
 @app.task(name='twitter_tasks.pushRenderedTweets2Neo', bind=True)
