@@ -14,7 +14,7 @@ from app import app
 from db_settings import get_neo_driver, cache
 from solr_tools import tweets2Solr
 from twitter_settings import *
-from twitter_tools.neo import  connections2Neo, tweetDump2Neo, users2Neo, setUserDefunct
+from twitter_tools.neo import connections2Neo, tweetDump2Neo, users2Neo, setUserDefunct
 from twitter_tools.rated_twitter import RatedTwitter
 from twitter_tools.streaming_twitter import StreamingTwitter
 from twitter_tools.tools import renderTwitterUser, decomposeTweets
@@ -115,8 +115,12 @@ def stream_filter(self, credentials=False, retry_count=None, track=None):
 def push_stream_results(self, results):
 
     logger.info('***Push twitter filter stream results***')
+    users = []
     for tweet in results:
-        pushTwitterUsers.delay([tweet['user']])
+        users.append(tweet['user'])
+    pushTwitterUsers.delay(users)
+    for tweet in results:
+        logger.info('***Push tweet id %s***' % (tweet['id']))
         pushTweets.delay([tweet], tweet['user']['screen_name'])
 
 

@@ -73,7 +73,7 @@ def pushEntities(tweet, entity_store):
 
 
 def entityStore():
-    ents = {key:[] for key in entity_types}
+    ents = {key: [] for key in entity_types}
     ents['media'] = []
     return ents
 

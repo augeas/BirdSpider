@@ -151,7 +151,7 @@ def tweetActions(db, user, rendered_tweets, label='tweet'):
     merge = "MERGE (u)-[:{}]->(t)".format(actions[label])
 
     tweets = (t[-1] for t in rendered_tweets)
-    data = [{'id_str':tweet['id_str']} for tweet in tweets]
+    data = [{'id_str': tweet['id_str']} for tweet in tweets]
 
     unwind_tx(db, data, match, merge)
     
@@ -196,14 +196,14 @@ def tweetLinks(db, links, src_label, dest_label, relation):
         '*** PUSHED %d TWEET LINKS TO NEO IN %ds ***' %
         (len(links),how_long))
 
-entity_node_lables = {'hashtags': 'hashtag', 'urls':'url', 'media': 'media'}
+entity_node_labels = {'hashtags': 'hashtag', 'urls': 'url', 'media': 'media'}
 entity_ids = {'hashtags': 'text', 'urls': 'expanded_url', 'media': 'id_str'}
 
 
 def entities2neo(db, entities, entity_type):
     started = datetime.now()
     
-    merge = "MERGE (x:{} {{id: d.id}})".format(entity_node_lables[entity_type])
+    merge = "MERGE (x:{} {{id: d.id}})".format(entity_node_labels[entity_type])
     
     update = "SET x += d.props"
     
