@@ -41,14 +41,14 @@ def start_user_crawl(db, user, crawl_task, status='initiated'):
 def update_crawl(db, crawl_task, status):
     updated = datetime.now()
     right_now = updated.isoformat()
-    crawl_data = {'timestamp': right_now, 'status': status}
-    query = '''UNWIND {data} AS d
-    MATCH (c:crawl {{crawl_task: '{}'}})
-    SET c.status = d.status, c.timestamp = d.right_now'''.format(crawl_task)
+
+    match = "MATCH  (c:crawl {{crawl_task: '{}'}})".format(crawl_task)
+    update = "SET c.status = '{}', c.timestamp = '{}'".format(status, right_now)
+    query = '\n'.join([match, update])
 
     with db.session() as session:
         with session.begin_transaction() as tx:
-            tx.run(query, data=crawl_data)
+            tx.run(query)
 
 
 
