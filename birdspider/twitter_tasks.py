@@ -18,7 +18,7 @@ from twitter_tools.neo import connections2Neo, tweetDump2Neo, users2Neo, setUser
 from twitter_tools.rated_twitter import RatedTwitter
 from twitter_tools.streaming_twitter import StreamingTwitter
 from twitter_tools.tools import renderTwitterUser, decomposeTweets
-from crawl.crawl_cypher import nextNearest, whoNext
+from crawl.crawl_cypher import nextNearest, whoNext, start_user_crawl, update_crawl
 
 logger = get_task_logger(__name__)
 
@@ -428,6 +428,11 @@ def startUserScrape(self, user, credentials=False):
     cache.set('scrape_mode_' + self.request.root_id, 'user')
     cache.set('scrape_user_' + self.request.root_id, user)
 
+    # add crawl node for this user as centre of scrape
+    db = get_neo_driver()
+    start_user_crawl(db, user, crawl_task=self.request.root_id, status='initiated')
+    db.close()
+
     for key in ['scrape_friends','scrape_followers', 'scrape_tweets']:
         cache.set(key + self.request.root_id, '')
         
@@ -443,17 +448,21 @@ def doUserScrape(self, credentials=False):
     """Retrieve the next timelines, friends and followers for the next accounts in the user scrape. """
     keep_going = cache.get('user_scrape_' + self.request.root_id)
     if (not keep_going) or keep_going.decode('utf-8') != 'true':
-        logger.info('*** STOPPED USER SCRAPE ***') 
+        logger.info('*** STOPPED USER SCRAPE ***')
+        # mark crawl as stopped on crawl node
+        db = get_neo_driver()
+        update_crawl(db, crawl_task=self.request.root_id, status='done')
+        db.close()
         return False
-    
-    db = get_neo_driver()
-    
+
     user = cache.get('scrape_user_' + self.request.root_id).decode('utf-8')
     logger.info('*** SCRAPING USER: %s... ***' % (user,))
 
     this_friend = cache.get('scrape_friends_' + self.request.root_id).decode('utf-8')
     if (not this_friend) or this_friend == 'done':
+        db = get_neo_driver()
         next_friends = nextNearest(db, user, 'friends', self.request.root_id)
+        db.close()
         if next_friends:
             cache.set('scrape_friends_' + self.request.root_id, 'running')
             getTwitterConnections.delay(next_friends, cacheKey='scrape_friends_' + self.request.root_id)
@@ -462,7 +471,9 @@ def doUserScrape(self, credentials=False):
 
     this_follower = cache.get('scrape_followers_' + self.request.root_id).decode('utf-8')
     if (not this_follower) or this_follower == 'done':
+        db = get_neo_driver()
         next_followers = nextNearest(db, user, 'followers', self.request.root_id)
+        db.close()
         if next_followers:
             cache.set('scrape_followers_' + self.request.root_id, 'running')
             getTwitterConnections.delay(next_followers, friends=False, cacheKey='scrape_followers_' + self.request.root_id)
@@ -471,7 +482,9 @@ def doUserScrape(self, credentials=False):
 
     this_tweet = cache.get('scrape_tweets').decode('utf-8')
     if (not this_tweet) or this_tweet == 'done':
+        db = get_neo_driver()
         next_tweets = nextNearest(db, user, 'tweets', self.request.root_id)
+        db.close()
         if next_tweets:
             cache.set('scrape_tweets_' + self.request.root_id, 'running')
             getTweets.delay(next_tweets, maxTweets=1000, credentials=credentials, cacheKey='scrape_tweets_' + self.request.root_id)
@@ -487,7 +500,6 @@ def doUserScrape(self, credentials=False):
         cache.set('scrape_mode_' + self.request.root_id, '')
         logger.info('*** FINISHED SCRAPING USER: %s ***' % (user,))
 
-    db.close()
 
 
 # currently does simplistic cache value based halt. The effect is that the next time round on the loop, the
