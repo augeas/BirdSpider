@@ -27,7 +27,7 @@ docker-compose build
 
 You will need to apply for a [Twitter development account](https://developer.twitter.com/en/apply/user)
 and [create a new app](https://apps.twitter.com/). Then you can fill in the credentials in "run.sh".
-You should also change a Neo4j password and probably increase it's
+You should also change a Neo4j password and probably increase its
 [container's](https://neo4j.com/docs/operations-manual/current/installation/docker/) RAM.
 
 
@@ -57,13 +57,14 @@ Now you can start the database and Celery worker:
 The crawler is controlled by a set of Celery tasks. Before starting any tasks, you should verify that
 Neo4j is running by visiting the "NEO_HOST" host in a web Browser and logging in with the credentials
 specified in "run.sh".
+By default this uses application level OAUTH2 authorization. See later is this guide for OAUTH1 instructions.
 Having installed celery, you can call the tasks by name. To get all the Tweets for
 the [@emfcamp](https://twitter.com/emfcamp) account:
 
 ```python
 from celery import Celery
 app = Celery('birdspider', broker='redis://localhost:6379', backend='redis://localhost:6379')
-app.send_task('twitter_tasks.getTweets', args=['emfcamp'])   
+app.send_task('twitter_tasks.getTweets', args=['emfcamp'])
 
 ```
 
@@ -94,15 +95,43 @@ app.send_task('twitter_tasks.seedUser', args=['emfcamp', 'True'])
 A user scrape has a stopping condition within it, but you may sometimes wish to stop a scrape early.
 Scraping a user checks that the cache key user_scrape == 'true' to signal 'keep going'
 If you wish to halt a running scrape before it finishes, for the moment you should change this key to 'false'.
+To do this you will need to keep the task_id returned as the result of calling Celery app.send_task
+result = app.send_task(task_name,args=[arg0,arg1..., argn])
+task_id = result.task_id
+
 A better interface for this is a TODO
 
 ```python
 import redis
 # assuming redis is accessible on localhost, substitute hostname as appropriate
+task_id = 'root task id of seedUser task you want to stop goes here'
 cache = redis.StrictRedis(host='localhost')
-cache.set('user_scrape', 'false')
+cache.set('user_scrape_' + task_id, 'false')
 
 ```
+
+### Passing User level OAUTH1 credentials to twitter tasks ###
+
+As noted above by default BirdSpider now uses application level OAUTH2 authorisation for Twitter API calls.
+This means all calls are using one single rate limit on calls. User level OAUTH1 calls can be used to spread calls
+across multiple rate limits, as each user will have their own rate limit.
+Note: the user should have authorised the application, also note that at the moment this is not
+ securing or encrypting the keys and that fact needs fixing!
+
+ example is for scraping a user
+
+ ```python
+ import json
+ from celery import Celery
+ credentials = {
+    'oauth1_token': 'your_user_oauth_token_here',
+    'oauth1_secret': 'your_user_oauth_secret_here',
+ }
+ app = Celery('birdspider', broker='redis://localhost:6379', backend='redis://localhost:6379')
+ app.send_task('twitter_tasks.seedUser', args=['emfcamp', 'True'], kwargs={ 'credentials': json.dumps(credentials)})
+
+ ```
+
 
 ### Clustering around a twitter user
 

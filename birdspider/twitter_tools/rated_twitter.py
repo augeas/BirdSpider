@@ -1,3 +1,4 @@
+# Licensed under the Apache License Version 2.0: http://www.apache.org/licenses/LICENSE-2.0.txt
 
 from datetime import datetime
 import json
@@ -14,15 +15,22 @@ __twitter_methods__ = [m for m in dir(EndpointsMixin) if not m.startswith('__')]
 class RatedTwitter(object):    
     """Wrapper around the Twython class that tracks whether API calls are rate-limited."""
 
-    def __init__(self,use_local=True):
-        if use_local:
-            self.twitter = Twython(CONSUMER_KEY,CONSUMER_SECRET,OAUTH_TOKEN,OAUTH_TOKEN_SECRET)
-            self.handle = 'local_'
-        else:
-            self.twitter = Twython(CONSUMER_KEY,access_token=ACCESS_TOKEN)
+    def __init__(self, use_app=True, credentials=False):
+        if credentials:
+            oauth1_token = credentials.get('oauth1_token')
+            oauth1_secret = credentials.get('oauth1_secret')
+            logging.info("*** Calls to Twitter APIs will use user provided OAUTH1 user authentication token and secret ***")
+            self.twitter = Twython(CONSUMER_KEY, CONSUMER_SECRET, oauth1_token, oauth1_secret)
+        elif use_app:
+            logging.info("*** Calls to Twitter APIs will use preconfigured OAUTH2 application authentication ***")
+            self.twitter = Twython(CONSUMER_KEY, access_token=ACCESS_TOKEN, oauth_version=2)
             self.handle = 'app_'
+        else:   # TODO handle this choice better
+            logging.info("*** Calls to Twitter APIs will use preconfigured OAUTH1 user authentication token and secret ***")
+            self.twitter = Twython(CONSUMER_KEY, CONSUMER_SECRET, OAUTH_TOKEN, OAUTH_TOKEN_SECRET)
+            self.handle = 'local_'
             
-    def can_we_do_that(self,method_name):
+    def can_we_do_that(self, method_name):
         """Check whether a given API call is rate-limited, return the estimated time to wait in seconds.
     
         Positional arguments:
@@ -62,27 +70,27 @@ class RatedTwitter(object):
         
         # Does Twython even know how to do that?
         try: 
-            method = getattr(self.twitter,method_name)
+            method = getattr(self.twitter, method_name)
         except:
             logging.error('*** NO SUCH TWITTER METHOD: '+method_name+' ***')
             return (False,'no_such_method')
         
         # Call the method of the Twython object.
         try:
-            result = (True,method(*args, **kwargs)) 
+            result = (True, method(*args, **kwargs))
         except TwythonAuthError:
             logging.error('*** TWITTER METHOD 401: '+method_name+' ***')
-            result = (False,'forbidden')
+            result = (False, 'forbidden')
         except TwythonRateLimitError:
             logging.error('*** TWITTER METHOD LIMITED: '+method_name+' ***')
-            result = (False,'limited')
+            result = (False, 'limited')
         except TwythonError as e:
             if str(e.error_code) == '404':
                 logging.error('*** TWITTER METHOD 404: '+method_name+' ***')
-                result = (False,'404')
+                result = (False, '404')
             else:
                 logging.error('*** TWITTER METHOD FAILED: '+method_name+' ***')
-                result = (False,'unknown')
+                result = (False, 'unknown')
             logging.error(args)
 
         # Have we been told how many calls remain in the current window?
@@ -98,7 +106,7 @@ class RatedTwitter(object):
             reset = datetime.utcfromtimestamp(int(xReset)).isoformat()
         if xLimit and xReset:
             # Store the current number of remaining calls and time when the window resets.
-            cache.set(self.handle+method_name,json.dumps({'limit':limit, 'reset':reset})) 
+            cache.set(self.handle+method_name, json.dumps({'limit':limit, 'reset':reset}))
 
         return result
                 
@@ -123,8 +131,10 @@ def rated_method_factory(name):
 
 for name in __twitter_methods__:
     setattr(RatedTwitter, name+'_wait', rated_method_factory(name))
-                
+
+
+# appears to not be in use anywhere
 def getTwitterAPI(credentials=False):
     """Return a Twitter API object from oauth credentials, defaulting to those in db_settings."""
     if not credentials:
-        return Twython(CONSUMER_KEY,access_token=ACCESS_TOKEN)
+        return Twython(CONSUMER_KEY, access_token=ACCESS_TOKEN)

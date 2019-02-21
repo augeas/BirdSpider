@@ -1,3 +1,7 @@
+# Licensed under the Apache License Version 2.0: http://www.apache.org/licenses/LICENSE-2.0.txt
+"""Celery tasks relating to clustering."""
+__author__ = 'Meg Gordon'
+
 from celery.utils.log import get_task_logger
 
 from app import app
@@ -29,9 +33,9 @@ def cluster(seed, seed_type, query_name):
 
     logger.info('*** CLUSTERING: get matrix for seed %s ***' % seed)
     matrix_labels_and_results = twitterMatrix(db, query)
-    logger.info('*** CLUSTERING: find clusters  ***' )
+    logger.info('*** CLUSTERING: find clusters for seed %s ***' )
     cluster_results = clusterize(matrix_labels_and_results[1])
-    logger.info('*** CLUSTERING: label clusters ***' )
+    logger.info('*** CLUSTERING: label clusters for seed %s ***' )
     labelled_clusters = labelClusters(cluster_results[0], matrix_labels_and_results[0])
 
     if seed_type == 'twitter_user':

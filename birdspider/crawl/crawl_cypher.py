@@ -94,9 +94,9 @@ def whoNext(job, latest=False):
     return victim_list[0]
 
 
-def nextNearest(db, user, job, max_friends=2000, max_followers=2000, limit=20, max_tweets=2000, test=False):
+def nextNearest(db, user, job, root_task, max_friends=2000, max_followers=2000, limit=20, max_tweets=2000, test=False):
     """Find the next user to retrieve friends, followers or tweets, closest to a given user."""
-    cacheKey = '_'.join(['nextnearest', job, user])
+    cacheKey = '_'.join(['nextnearest', job, user, root_task])
     nextUserDump = cache.get(cacheKey).decode('utf-8')
     next_users = False
     if nextUserDump:
@@ -105,7 +105,7 @@ def nextNearest(db, user, job, max_friends=2000, max_followers=2000, limit=20, m
         except:
             next_users = []
     if next_users:
-        logging.info('*** NEXT '+job+': '+', '.join(next_users)+' ***')
+        logging.info('*** NEXT '+job+': '+', '.join(next_users)+' from '+user+' ***')
         next_user = next_users.pop(0)
         cache.set(cacheKey, json.dumps(next_users))
         return next_user
@@ -129,7 +129,7 @@ def nextNearest(db, user, job, max_friends=2000, max_followers=2000, limit=20, m
         query_str += 'AND b.statuses_count > 0 AND n < b.statuses_count/2 AND n<{} '.format(max_tweets)
     query_str += 'RETURN b.screen_name ORDER BY b.{}_last_scraped LIMIT {}'.format(job, limit)
 
-    logging.info('*** Looking for '+job+' ***')
+    logging.info('*** Looking for '+job+' for '+user+' ***')
 
     if test:
         return query_str
@@ -144,7 +144,7 @@ def nextNearest(db, user, job, max_friends=2000, max_followers=2000, limit=20, m
         next_users = []
 
     if next_users:
-        logging.info('*** NEXT '+job+': '+', '.join(next_users)+' ***')
+        logging.info('*** NEXT '+job+': '+', '.join(next_users)+' from '+user+' ***')
         next_user = next_users.pop(0)
         cache.set(cacheKey, json.dumps(next_users))
         return next_user

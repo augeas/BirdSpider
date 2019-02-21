@@ -1,6 +1,7 @@
+# Licensed under the Apache License Version 2.0: http://www.apache.org/licenses/LICENSE-2.0.txt
+
 from datetime import datetime
 
-#[['picopony', 'Dino_Pony', 'SilkyRaven', 'hartclaudia1'],['squirmelia','crispjodi','kingseesar','augeas','victoria_dft','matthewchilton']]
 # design of neo graph nodes and relationships for clusters
 # node of label type clustering
 # when done
@@ -9,6 +10,8 @@ from datetime import datetime
 # indiv clusters have rel to clustering node (clustered_by?? )
 # indiv users have member of rel to clusters (member of cluster)
 # users are members of a clusters, clusters belong to a clustering session
+
+
 def user_clusters_to_neo(db, labelled_clusters, seed_user, adjacency_criteria):
     clustering_id = clustering_to_neo(db, seed_user, 'twitter_user', 'screen_name', adjacency_criteria)
 

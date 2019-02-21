@@ -21,8 +21,8 @@ from crawl.crawl_cypher import nextNearest, whoNext
 logger = get_task_logger(__name__)
 
 
-@app.task
-def twitterCall(method_name, **kwargs):
+@app.task(name='twitter_tasks.twitterCall', bind=True)
+def twitterCall(self, method_name, credentials=False, **kwargs):
     """Attempt a given Twitter API call, retry if rate-limited. Returns the result of the call.
     
         Positional arguments:
@@ -30,11 +30,11 @@ def twitterCall(method_name, **kwargs):
         args -- a dicionary of keyword arguments
         
     """
-    api = RatedTwitter()
+    api = RatedTwitter(credentials=credentials)
     limit = api.can_we_do_that(method_name)
     if limit:
         logger.info('*** TWITTER RATE-LIMITED: %s ***' % method_name)
-        raise twitterCall.retry(exc=Exception('Twitter rate-limited',method_name), countdown = limit)
+        raise twitterCall.retry(exc=Exception('Twitter rate-limited', method_name), countdown=limit)
     else:
         okay, result = api.method_call(method_name, **kwargs)
         if okay:
@@ -43,14 +43,16 @@ def twitterCall(method_name, **kwargs):
         else:
             assert False
 
-@app.task
-def pushRenderedTwits2Neo(twits):
+
+@app.task(name='twitter_tasks.pushRenderedTwits2Neo', bind=True)
+def pushRenderedTwits2Neo(self, twits):
     db = get_neo_driver()
     users2Neo(db, twits)
     db.close()
 
-@app.task
-def pushTwitterUsers(twits):
+
+@app.task(name='twitter_tasks.pushTwitterUsers')
+def pushTwitterUsers(self, twits):
     """Store Twitter users returned by a Twitter API call in Neo4J.
     
     Positional arguments:
@@ -64,8 +66,8 @@ def pushTwitterUsers(twits):
     pushRenderedTwits2Neo.delay(renderedTwits)
 
 
-@app.task
-def getTwitterUsers(users,credentials=False):
+@app.task(name='twitter_tasks.getTwitterUsers', bind=True)
+def getTwitterUsers(self, users, credentials=False):
     """Look-up a set of Twitter users by screen_name and store them in Neo4J.
 
     Positional arguments:
@@ -73,21 +75,23 @@ def getTwitterUsers(users,credentials=False):
     
     """
     userList = ','.join(users)
-    chain(twitterCall.s('lookup_user',**{'screen_name':userList}), pushTwitterUsers.s())()
+    chain(twitterCall.s('lookup_user', credentials, **{'screen_name': userList}), pushTwitterUsers.s())()
 
 
-@app.task
-def pushRenderedTweets2Neo(user, tweetDump):
+@app.task(name='twitter_tasks.pushRenderedTweets2Neo', bind=True)
+def pushRenderedTweets2Neo(self, user, tweetDump):
     db = get_neo_driver()
     tweetDump2Neo(db, user, tweetDump)
     db.close()
-    
-@app.task
-def pushRenderedTweets2Solr(tweets):
+
+
+@app.task(name='twitter_tasks.pushRenderedTweets2Solr', bind=True)
+def pushRenderedTweets2Solr(self, tweets):
     tweets2Solr(tweets)
 
-@app.task
-def pushTweets(tweets, user, cacheKey=False):
+
+@app.task(name='twitter_tasks.pushTweets', bind=True)
+def pushTweets(self, tweets, user, cacheKey=False):
     """ Dump a set of tweets from a given user's timeline to Neo4J/Solr.
 
     Positional arguments:
@@ -98,8 +102,10 @@ def pushTweets(tweets, user, cacheKey=False):
     cacheKey -- a Redis key that identifies an on-going task to grab a user's timeline
     
     """
-    
-    tweetDump = decomposeTweets(tweets) # Extract mentions, URLs, replies hashtags etc...
+    logger.info('Executing pushTweets task id {0.id}, args: {0.args!r} kwargs: {0.kwargs!r}'.format(self.request))
+    logger.info('task parent id {0.parent_id}, root id {0.root_id}'.format(self.request))
+
+    tweetDump = decomposeTweets(tweets)  # Extract mentions, URLs, replies hashtags etc...
 
     pushRenderedTweets2Neo.delay(user, tweetDump)
         
@@ -107,11 +113,14 @@ def pushTweets(tweets, user, cacheKey=False):
         pushRenderedTweets2Solr.delay([t[0] for t in tweetDump[label]])
 
     if cacheKey: # These are the last Tweets, tell the scaper we're done.
-        cache.set(cacheKey,'done')
+        cache.set(cacheKey, 'done')
         logger.info('*** %s: DONE WITH TWEETS ***' % user) 
 
-@app.task
-def getTweets(user, maxTweets=3000, count=0, tweetId=0, cacheKey=False, credentials=False):
+
+@app.task(name='twitter_tasks.getTweets', bind=True)
+def getTweets(self, user, maxTweets=3000, count=0, tweetId=0, cacheKey=False, credentials=False):
+    logger.info('Executing getTweets task id {0.id}, args: {0.args!r} kwargs: {0.kwargs!r}'.format(self.request))
+    logger.info('task parent id {0.parent_id}, root id {0.root_id}'.format(self.request))
     """Get tweets from the timeline of the given user, push them to Neo4J.
     
     Positional arguments:
@@ -124,7 +133,7 @@ def getTweets(user, maxTweets=3000, count=0, tweetId=0, cacheKey=False, credenti
     tweetId -- The maximum tweet ID to retrieve, set when the task calls itself
     
     """
-    api = RatedTwitter()
+    api = RatedTwitter(credentials=credentials)
     limit = api.get_user_timeline_wait()
     if limit:
         logger.info('*** TWITTER RATE-LIMITED: statuses.user_timeline: %s:%d  ***' % (user, str(count)))
@@ -151,22 +160,26 @@ def getTweets(user, maxTweets=3000, count=0, tweetId=0, cacheKey=False, credenti
                 # Not done yet, the task calls itself with an updated count and tweetId.
                 getTweets.delay(user, maxTweets=maxTweets, count=newCount, tweetId=newTweetId, cacheKey=cacheKey, credentials=credentials)
             else:
-                pushTweets.delay([], user, cacheKey=cacheKey) # Nothing more found, so tell pushTweets the job is done.
+                pushTweets.delay([], user, cacheKey=cacheKey)  # Nothing more found, so tell pushTweets the job is done.
         else:
             if result == '404':
-                setUserDefunct(user)
-            cache.set('scrape_tweets', 'done')
+                db = get_neo_driver()
+                setUserDefunct(db, user)
+                db.close()
+            cache.set('scrape_tweets_' + self.request.root_id, 'done')
             if result == 'limited':
-                raise getTweets.retry(countdown = api.get_user_timeline_wait())
+                raise getTweets.retry(countdown=api.get_user_timeline_wait())
 
-@app.task
-def pushRenderedConnections2Neo(user, renderedTwits, friends=True):
+
+@app.task(name='twitter_tasks.pushRenderedConnections2Neo', bind=True)
+def pushRenderedConnections2Neo(self, user, renderedTwits, friends=True):
     db = get_neo_driver()
     connections2Neo(db, user,renderedTwits,friends=friends)
     db.close()
-                        
-@app.task
-def pushTwitterConnections(twits, user, friends=True, cacheKey=False):
+
+
+@app.task(name='twitter_tasks.pushTwitterConnections', bind=True)
+def pushTwitterConnections(self, twits, user, friends=True, cacheKey=False):
     """Push the Twitter connections of a given user to Neo4J.
     
     Positional arguments:
@@ -188,12 +201,13 @@ def pushTwitterConnections(twits, user, friends=True, cacheKey=False):
         rendered_twits = [renderTwitterUser(twit) for twit in twits]
         pushRenderedConnections2Neo.delay(user, rendered_twits, friends=friends)
 # These are the last Tweets, tell the scaper we're done.
-    if cacheKey: # These are the last connections, tell the scaper we're done.
+    if cacheKey:  # These are the last connections, tell the scaper we're done.
         cache.set(cacheKey, 'done')
         logger.info('*** %s: DONE WITH %s ***' % (user, job))
 
-@app.task
-def getTwitterConnections(user, friends=True, cursor=-1, credentials=False, cacheKey=False):
+
+@app.task(name='twitter_tasks.getTwitterConnections', bind=True)
+def getTwitterConnections(self, user, friends=True, cursor=-1, credentials=False, cacheKey=False):
     """Get the connections of the given user, push them to Neo4J.
 
     Positional arguments:
@@ -204,7 +218,7 @@ def getTwitterConnections(user, friends=True, cursor=-1, credentials=False, cach
     cacheKey -- a Redis key that identifies an on-going task to grab a user's friends or followers
     cursor -- Id of the next block of connections to retrieve, set when the task calls itself
     """
-    api = RatedTwitter()
+    api = RatedTwitter(credentials=credentials)
     if friends:
         method = api.get_friends_list
         limit = api.get_friends_list_wait()
@@ -218,7 +232,7 @@ def getTwitterConnections(user, friends=True, cursor=-1, credentials=False, cach
         logger.info('*** TWITTER RATE-LIMITED: %s:%s ***' % (method_name, str(cursor)))
         raise getTwitterConnections.retry(countdown=limit)
     else:
-        okay,result = method(screen_name=user, cursor=cursor, count=200) # We can get a maximum of 200 connections at once.       
+        okay, result = method(screen_name=user, cursor=cursor, count=200)  # We can get a maximum of 200 connections at once.
         if okay:
             logger.info('*** TWITTER CURSOR: %s:%s:%s ***' % (method_name, user, str(cursor)))
             twits = result['users']
@@ -233,131 +247,145 @@ def getTwitterConnections(user, friends=True, cursor=-1, credentials=False, cach
             if result == 'limited':
                 raise getTwitterConnections.retry(exc=Exception('Twitter rate-limited', method_name), countdown=API_TIMEOUT)
             if result == '404':
-                setUserDefunct(user)
+                db = get_neo_driver()
+                setUserDefunct(db, user)
+                db.close()
                 if friends:
-                    cache.set('scrape_friends', 'done')
+                    cache.set('scrape_friends_' + self.request.root_id, 'done')
                 else:
-                    cache.set('scrape_followers', 'done')
+                    cache.set('scrape_followers_' + self.request.root_id, 'done')
 
-@app.task
-def seedUser(user, scrape=False):
+
+@app.task(name='twitter_tasks.seedUser', bind=True)
+def seedUser(self, user, scrape=False, credentials=False):
     """Retrieve the given Twitter user's account, and their timelines, friends and followers. Optionally, start scraping around them."""
     logger.info('*** SEEDING: %s ***' % (user,))
-    if scrape:
-        chain(getTwitterUsers.s([user]), getTwitterConnections.si(user), getTwitterConnections.si(user, friends=False),
-              getTweets.si(user, maxTweets=1000), startUserScrape.si(user))()
-    else:
-        chain(getTwitterUsers.s([user]), getTwitterConnections.si(user), getTwitterConnections.si(user, friends=False),
-              getTweets.si(user, maxTweets=1000))()
+    logger.info('Executing getTweets task id {0.id}, args: {0.args!r} kwargs: {0.kwargs!r}'.format(self.request))
+    logger.info('task parent id {0.parent_id}, root id {0.root_id}'.format(self.request))
 
-@app.task
-def startScrape(latest=False):
+    if scrape:
+        chain(getTwitterUsers.s([user], credentials=credentials),
+              getTwitterConnections.si(user, credentials=credentials), getTwitterConnections.si(user, credentials=credentials, friends=False),
+              getTweets.si(user, maxTweets=1000, credentials=credentials), startUserScrape.si(user, credentials=credentials))()
+    else:
+        chain(getTwitterUsers.s([user], credentials=credentials), getTwitterConnections.si(user, credentials=credentials),
+              getTwitterConnections.si(user, credentials=credentials, friends=False),
+              getTweets.si(user, maxTweets=1000, credentials=credentials))()
+
+
+@app.task(name='twitter_tasks.startScrape', bind=True)
+def startScrape(self, latest=False, credentials=False):
     """Start the default scrape, retrieving the users that need timelines, friends or followers updated,
     in the order that they were first added. """
     logger.info('*** STARTED SCRAPING: DEFAULT: ***') 
-    cache.set('default_scrape', 'true')
-    cache.set('scrape_mode', 'default')
+    cache.set('default_scrape_' + self.request.root_id, 'true')
+    cache.set('scrape_mode_' + self.request.root_id, 'default')
     
     for key in ['scrape_friends', 'scrape_followers', 'scrape_tweets']:
-        cache.set(key, '')
+        cache.set(key + '_' + self.request.root_id, '')
     
-    doDefaultScrape.delay(latest=latest)
-          
-@app.task
-def doDefaultScrape(latest=False):
+    doDefaultScrape.delay(latest=latest, credentials=credentials)
+
+
+@app.task(name='twitter_tasks.doDefaultScrape', bind=True)
+def doDefaultScrape(self, latest=False, credentials=False):
     """Retrieve the tweets, friends or followers of trhe next users in the default scrape."""
-    keep_going = cache.get('default_scrape').decode('utf-8')
-    if (not keep_going) or keep_going != 'true':
+    keep_going = cache.get('default_scrape_' + self.request.root_id)
+    if (not keep_going) or keep_going.decode('utf-8') != 'true':
         logger.info('*** STOPPED DEFAULT SCRAPE ***') 
         return False
     
     logger.info('*** SCRAPING... ***')
 
-    this_friend = cache.get('scrape_friends').decode('utf-8')
-    if (not this_friend) or this_friend == 'done':
-        cache.set('scrape_friends','running')
-        getTwitterConnections.delay(whoNext('friends', latest=latest), cacheKey='scrape_friends')
+    this_friend = cache.get('scrape_friends_' + self.request.root_id)
+    if (not this_friend) or this_friend.decode('utf-8') == 'done':
+        cache.set('scrape_friends_' + self.request.root_id, 'running')
+        getTwitterConnections.delay(whoNext('friends', latest=latest),  credentials=credentials, cacheKey='scrape_friends_' + self.request.root_id)
     else:
         logger.info('*** FRIENDS BUSY ***')
 
-    this_follower = cache.get('scrape_followers').decode('utf-8')
-    if (not this_follower) or this_follower == 'done':
-        cache.set('scrape_followers','running')
-        getTwitterConnections.delay(whoNext('friends', latest=latest), friends=False, cacheKey='scrape_followers')
+    this_follower = cache.get('scrape_followers_' + self.request.root_id)
+    if (not this_follower) or this_follower.decode('utf-8') == 'done':
+        cache.set('scrape_followers_' + self.request.root_id, 'running')
+        getTwitterConnections.delay(whoNext('friends', latest=latest), credentials=credentials, friends=False, cacheKey='scrape_followers_' + self.request.root_id)
     else:
         logger.info('*** FOLLOWERS BUSY ***')
 
-    this_tweet = cache.get('scrape_tweets').decode('utf-8')
-    if (not this_tweet) or this_tweet == 'done':
-        cache.set('scrape_tweets', 'running')
-        getTweets.delay(whoNext('tweets', latest=latest), maxTweets=1000, cacheKey='scrape_tweets')
+    this_tweet = cache.get('scrape_tweets_' + self.request.root_id)
+    if (not this_tweet) or this_tweet.decode('utf-8') == 'done':
+        cache.set('scrape_tweets_' + self.request.root_id, 'running')
+        getTweets.delay(whoNext('tweets', latest=latest), maxTweets=1000, credentials=credentials, cacheKey='scrape_tweets_' + self.request.root_id)
     else:
         logger.info('*** TWEETS BUSY ***')
                     
-    doDefaultScrape.apply_async(kwargs={'latest':latest},countdown=30)
+    doDefaultScrape.apply_async(kwargs={'latest': latest}, credentials=credentials, countdown=30)
 
-@app.task
-def startUserScrape(user):
+
+@app.task(name='twitter_tasks.startUserScrape', bind=True)
+def startUserScrape(self, user, credentials=False):
     """Start scraping around the given user."""
     logger.info('*** STARTED SCRAPING: USER: %s ***' % (user,))
-    cache.set('user_scrape', 'true')
-    cache.set('scrape_mode', 'user')
-    cache.set('scrape_user', user)
+    cache.set('user_scrape_' + self.request.root_id, 'true')
+    cache.set('scrape_mode_' + self.request.root_id, 'user')
+    cache.set('scrape_user_' + self.request.root_id, user)
 
     for key in ['scrape_friends','scrape_followers', 'scrape_tweets']:
-        cache.set(key, '')
+        cache.set(key + self.request.root_id, '')
         
     for job in ['friends', 'followers', 'tweets']:
-        cache_key = '_'.join(['nextnearest', job, user])
+        cache_key = '_'.join(['nextnearest', job, user, self.request.root_id])
         cache.set(cache_key, False)
         
-    doUserScrape.delay()
-    
-@app.task
-def doUserScrape():
+    doUserScrape.delay(credentials=credentials)
+
+
+@app.task(name='twitter_tasks.doUserScrape', bind=True)
+def doUserScrape(self, credentials=False):
     """Retrieve the next timelines, friends and followers for the next accounts in the user scrape. """
-    keep_going = cache.get('user_scrape').decode('utf-8')
-    if (not keep_going) or keep_going != 'true':
+    keep_going = cache.get('user_scrape_' + self.request.root_id)
+    if (not keep_going) or keep_going.decode('utf-8') != 'true':
         logger.info('*** STOPPED USER SCRAPE ***') 
         return False
     
     db = get_neo_driver()
     
-    user = cache.get('scrape_user').decode('utf-8')
+    user = cache.get('scrape_user_' + self.request.root_id).decode('utf-8')
     logger.info('*** SCRAPING USER: %s... ***' % (user,))
 
-    this_friend = cache.get('scrape_friends').decode('utf-8')
+    this_friend = cache.get('scrape_friends_' + self.request.root_id).decode('utf-8')
     if (not this_friend) or this_friend == 'done':
-        next_friends = nextNearest(db, user, 'friends')
+        next_friends = nextNearest(db, user, 'friends', self.request.root_id)
         if next_friends:
-            cache.set('scrape_friends', 'running')
-            getTwitterConnections.delay(next_friends, cacheKey='scrape_friends')
+            cache.set('scrape_friends_' + self.request.root_id, 'running')
+            getTwitterConnections.delay(next_friends, cacheKey='scrape_friends_' + self.request.root_id)
     else:
         logger.info('*** FRIENDS BUSY ***')
 
-    this_follower = cache.get('scrape_followers').decode('utf-8')
+    this_follower = cache.get('scrape_followers_' + self.request.root_id).decode('utf-8')
     if (not this_follower) or this_follower == 'done':
-        next_followers = nextNearest(db, user,'followers')
+        next_followers = nextNearest(db, user, 'followers', self.request.root_id)
         if next_followers:
-            cache.set('scrape_followers','running')
-            getTwitterConnections.delay(next_followers, friends=False, cacheKey='scrape_followers')
+            cache.set('scrape_followers_' + self.request.root_id, 'running')
+            getTwitterConnections.delay(next_followers, friends=False, cacheKey='scrape_followers_' + self.request.root_id)
     else:
         logger.info('*** FOLLOWERS BUSY ***')
 
     this_tweet = cache.get('scrape_tweets').decode('utf-8')
     if (not this_tweet) or this_tweet == 'done':
-        next_tweets = nextNearest(db, user, 'tweets')
+        next_tweets = nextNearest(db, user, 'tweets', self.request.root_id)
         if next_tweets:
-            cache.set('scrape_tweets', 'running')
-            getTweets.delay(next_tweets, maxTweets=1000, cacheKey='scrape_tweets')
+            cache.set('scrape_tweets_' + self.request.root_id, 'running')
+            getTweets.delay(next_tweets, maxTweets=1000, credentials=credentials, cacheKey='scrape_tweets_' + self.request.root_id)
     else:
         logger.info('*** TWEETS BUSY ***')
 
-    if 'running' in [cache.get(k).decode('utf-8') for k in ['scrape_friends', 'scrape_followers', 'scrape_tweets']]:
-        doUserScrape.apply_async(countdown=30)
+    if 'running' in [cache.get(k).decode('utf-8') for k in
+                     ['scrape_friends_' + self.request.root_id, 'scrape_followers_' + self.request.root_id,
+                      'scrape_tweets_' + self.request.root_id]]:
+        doUserScrape.apply_async(countdown=30, credentials=credentials)
     else:
-        cache.set('user_scrape', '')
-        cache.set('scrape_mode', '')
+        cache.set('user_scrape_' + self.request.root_id, 'false')
+        cache.set('scrape_mode_' + self.request.root_id, '')
         logger.info('*** FINISHED SCRAPING USER: %s ***' % (user,))
 
     db.close()
