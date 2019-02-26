@@ -56,7 +56,7 @@ def neo_tx(db, query, data=None):
                         tx.run(query, data=data)
                 success = True
             except:
-                logging.warning('*** Neo tx failed, attempt %d ***' % (tries+1,))
+                logging.warning('*** Neo tx failed, attempt %d ***' % (tries+1,), exc_info=True)
                 tries += 1
                 time.sleep(2)
                 

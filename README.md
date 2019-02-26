@@ -12,6 +12,12 @@ This usage rose further when tasks were running.
 
 ### Clone the repo and build the containers:
 
+For quick deployment (for testing, or for small scale production use) BirdSpider can be deployed in Docker
+as outlined below using the Dockerfiles and docker-compose included in the project.
+For larger installations, it may be desirable to split out and run the Neo4j and Solr containers separately to
+the BirdSpider tasks (which run on Celery and Redis). This can be done by changing the appropriate settings
+for the locations of the Neo4j and Solr hosts .
+
 Make sure you have [Docker](https://docs.docker.com/install/) and [Docker Compose](https://docs.docker.com/compose/)
 installed. Clone the repository, make a copy of the example "run.sh" script, then build/pull the containers.
 
