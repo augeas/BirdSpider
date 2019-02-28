@@ -433,12 +433,12 @@ def startUserScrape(self, user, credentials=False):
     start_user_crawl(db, user, crawl_task=self.request.root_id, status='initiated')
     db.close()
 
-    for key in ['scrape_friends','scrape_followers', 'scrape_tweets']:
-        cache.set(key + self.request.root_id, '')
+    for key in ['scrape_friends', 'scrape_followers', 'scrape_tweets']:
+        cache.set(key + '_' + self.request.root_id, '')
         
     for job in ['friends', 'followers', 'tweets']:
         cache_key = '_'.join(['nextnearest', job, user, self.request.root_id])
-        cache.set(cache_key, False)
+        cache.set(cache_key, '')
         
     doUserScrape.delay(credentials=credentials)
 
@@ -480,7 +480,7 @@ def doUserScrape(self, credentials=False):
     else:
         logger.info('*** FOLLOWERS BUSY ***')
 
-    this_tweet = cache.get('scrape_tweets').decode('utf-8')
+    this_tweet = cache.get('scrape_tweets_' + self.request.root_id).decode('utf-8')
     if (not this_tweet) or this_tweet == 'done':
         db = get_neo_driver()
         next_tweets = nextNearest(db, user, 'tweets', self.request.root_id)

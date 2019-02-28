@@ -8,6 +8,7 @@ import json
 import logging
 import redis
 from datetime import datetime, timedelta
+from db_settings import cache
 
 
 def start_user_crawl(db, user, crawl_task, status='initiated'):

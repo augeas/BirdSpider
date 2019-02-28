@@ -58,7 +58,7 @@ def neo_tx(db, query, data=None):
             except:
                 logging.warning('*** Neo tx failed, attempt %d ***' % (tries+1,), exc_info=True)
                 tries += 1
-                time.sleep(2)
+                time.sleep(10)
                 
     assert success
                 
