@@ -1,6 +1,7 @@
 # Licensed under the Apache License Version 2.0: http://www.apache.org/licenses/LICENSE-2.0.txt
 
 from datetime import datetime
+from itertools import chain, starmap
 import logging
 import re
 import time
@@ -161,6 +162,27 @@ def tweetActions(db, user, rendered_tweets, label='tweet'):
         (len(rendered_tweets), user, how_long))
 
 
+def multi_user_labelled_tweet_actions(db, tweet_dump, label='tweet'):
+    started = datetime.now()
+
+    actions = {'tweet': 'TWEETED', 'retweet': 'RETWEETED', 'quotetweet': 'QUOTED'}
+
+    match = ("MATCH (u:twitter_user {{screen_name: d.screen_name}})," +
+             " (t:{} {{id_str: d.id_str}})").format(label)
+
+    merge = "MERGE (u)-[:{}]->(t)".format(actions[label])
+
+    screen_names_and_tweets = (t[-2:] for t in tweet_dump)
+    data = [{'screen_name': screen_name, 'id_str': tweet['id_str']} for screen_name, tweet in screen_names_and_tweets]
+
+    unwind_tx(db, data, match, merge)
+
+    how_long = (datetime.now() - started).seconds
+    logging.info(
+        '*** PUSHED %d TWEET ACTIONS FOR MULTIPLE USERS TO NEO IN %ds ***' %
+        (len(data), how_long))
+
+
 def multi_user_tweet_actions(db, tweet_user_dump):
     started = datetime.now()
     match = ("MATCH (u:twitter_user {screen_name: d.name}), " +
@@ -294,7 +316,63 @@ def tweetDump2Neo(db, user, tweet_dump):
         if tweet_dump['entities'][label]['media']:
             entity_links(db, tweet_dump['entities'][label]['media'],
                          'EMBEDS', label, 'media', 'id_str', 'id_str')
-        
+
+
+def multiUserTweetDump2Neo(db, tweet_dump):
+    """Store rendered sets of tweets by given users in Neo4J.
+    """
+
+    # user->[tweeted/RTed/quoted]->(tweet/RT/quoteTweet)
+    for label in ['tweet', 'retweet', 'quotetweet']:
+        if tweet_dump[label]:
+            tweets2Neo(db, tweet_dump[label], label=label)
+            multi_user_labelled_tweet_actions(db, tweet_dump[label], label=label)
+
+    # push original tweets from RTs/quotes
+    for label in ['retweet', 'quotetweet']:
+        tweets = [(tw[0],) for tw in tweet_dump[label]]
+        if tweets:
+            tweets2Neo(db, tweets, label='tweet')
+
+    # (RT/quote)-[RETWEET_OF/QUOTE_OF]->(tweet)
+    if tweet_dump['retweet']:
+        tweetLinks(db, tweet_dump['retweet'], 'retweet', 'tweet', 'RETWEET_OF')
+    if tweet_dump['quotetweet']:
+        tweetLinks(db, tweet_dump['quotetweet'], 'quotetweet', 'tweet', 'QUOTE_OF')
+
+    # push users of original tweets.
+    if tweet_dump['users']:
+        users2Neo(db, tweet_dump['users'].values())
+        multi_user_tweet_actions(db, tweet_dump['users'])
+
+    # mentions
+    for label in ['tweet', 'retweet', 'quotetweet']:
+        mentions = [m[1] for m in tweet_dump['entities'][label]['user_mentions']]
+        if mentions:
+            users2Neo(db, mentions)
+            entities = tweet_dump['entities'][label]['user_mentions']
+            entity_links(db, entities, 'MENTIONS', label, 'twitter_user', 'id_str', 'screen_name')
+
+    # hashtags, urls and media
+    for label in ['tweet', 'retweet', 'quotetweet']:
+        for entity_type in ['hashtags', 'urls', 'media']:
+            entities = [e[1] for e in tweet_dump['entities'][label][entity_type]]
+            if entities:
+                entities2neo(db, entities, entity_type)
+
+        if tweet_dump['entities'][label]['hashtags']:
+            entity_links(db, tweet_dump['entities'][label]['hashtags'],
+                         'TAGGED', label, 'hashtag', 'id_str', 'text')
+
+        if tweet_dump['entities'][label]['urls']:
+            entity_links(db, tweet_dump['entities'][label]['urls'],
+                         'LINKS_TO', label, 'url', 'id_str', 'expanded_url')
+
+        if tweet_dump['entities'][label]['media']:
+            entity_links(db, tweet_dump['entities'][label]['media'],
+                         'EMBEDS', label, 'media', 'id_str', 'id_str')
+
+
 
 def setUserDefunct(db, user):
     match = "MATCH (t:twitter_user {{screen_name: '{}'}})".format(user)

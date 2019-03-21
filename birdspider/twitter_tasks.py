@@ -10,11 +10,13 @@ from celery import chain, group
 from celery.task.control import revoke
 from celery.utils.log import get_task_logger
 
+from itertools import groupby
+
 from app import app
 from db_settings import get_neo_driver, cache
 from solr_tools import tweets2Solr
 from twitter_settings import *
-from twitter_tools.neo import connections2Neo, tweetDump2Neo, users2Neo, setUserDefunct
+from twitter_tools.neo import connections2Neo, tweetDump2Neo, users2Neo, setUserDefunct, multiUserTweetDump2Neo
 from twitter_tools.rated_twitter import RatedTwitter
 from twitter_tools.streaming_twitter import StreamingTwitter
 from twitter_tools.tools import renderTwitterUser, decomposeTweets
@@ -112,16 +114,19 @@ def stream_filter(self, credentials=False, retry_count=None, track=None):
 
 
 @app.task(name='twitter_tasks.push_stream_results', bind=True)
-def push_stream_results(self, results):
+def push_stream_results(self, statuses):
 
     logger.info('***Push twitter filter stream results***')
-    users = []
-    for tweet in results:
-        users.append(tweet['user'])
+    sorted_statuses = sorted(statuses, key=lambda status: status['user']['screen_name'])
+
+    decomposed_tweets = decomposeTweets(statuses)
+
+    users = [list(group)[0]['user'] for key, group in groupby(sorted_statuses,
+                                                              lambda status: status['user']['screen_name'])]
+
     pushTwitterUsers.delay(users)
-    for tweet in results:
-        logger.info('***Push tweet id %s***' % (tweet['id']))
-        pushTweets.delay([tweet], tweet['user']['screen_name'])
+
+    pushRenderedMultiUserTweets2Neo.delay(decomposed_tweets)
 
 
 @app.task(name='twitter_tasks.search', bind=True)
@@ -173,9 +178,23 @@ def push_search_results(self, search_results, cacheKey=False):
 
     statuses = search_results['statuses']
 
-    for tweet in statuses:
-        pushTwitterUsers.delay([tweet['user']])
-        pushTweets.delay([tweet], tweet['user']['screen_name'])
+    sorted_statuses = sorted(statuses, key=lambda status: status['user']['screen_name'])
+
+    decomposed_tweets = decomposeTweets(statuses)
+
+    users = [list(group)[0]['user'] for key, group in groupby(sorted_statuses,
+                                                              lambda status: status['user']['screen_name'])]
+
+    pushTwitterUsers.delay(users)
+
+    pushRenderedMultiUserTweets2Neo.delay(decomposed_tweets)
+
+
+@app.task(name='twitter_tasks.pushRenderedMultiUserTweets2Neo', bind=True)
+def pushRenderedMultiUserTweets2Neo(self, all_tweets_dump):
+    db = get_neo_driver()
+    multiUserTweetDump2Neo(db, all_tweets_dump)
+    db.close()
 
 
 @app.task(name='twitter_tasks.pushRenderedTweets2Neo', bind=True)

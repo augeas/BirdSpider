@@ -15,7 +15,7 @@ from twitter_settings import *
 class StreamingTwitter(TwythonStreamer):
     """Wrapper around the Twython class to handle streaming Twitter calls."""
 
-    def __init__(self, stream_handler='twitter_tasks.push_stream_results', credentials=False, retry_count=None, stream_id='', batch_size=10, batch_wait_time=30):
+    def __init__(self, stream_handler='twitter_tasks.push_stream_results', credentials=False, retry_count=None, stream_id='', batch_size=100, batch_wait_time=30):
         self.stream_handler = stream_handler
         self.stream_id = stream_id
         self.tweets = list()
