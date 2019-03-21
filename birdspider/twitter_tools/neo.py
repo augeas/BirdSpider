@@ -209,7 +209,7 @@ def tweetLinks(db, links, src_label, dest_label, relation):
 
     merge = "MERGE (src)-[:{}]->(dest)".format(relation)
 
-    data = [{'src_id_str':src['id_str'], 'dest_id_str':dest['id_str']} for dest, src in links]
+    data = [{'src_id_str':src['id_str'], 'dest_id_str':dest['id_str']} for dest, screen_name, src in links]
     
     unwind_tx(db, data, match, merge)
        
