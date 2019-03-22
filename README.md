@@ -194,7 +194,12 @@ to stop streaming tweets.
 ....
 
 To stop a filter stream
-Use the task_id saved when starting the stream
+Use the task_id saved when starting the stream.
+BirdSpider will kill the task that is streaming from Twitter via the filter API call.
+This stops new tweets being added to the pile needing to be processed, but allows any other tasks
+that have already started to process prior tweets in the stream to finish what they are doing.
+(Please note that any tweets streamed but not yet sent to another task for processing are simply dropped as
+though they had not been streamed.)
 Presuming you are still in the same python session as when you requested the stream to start do the following.
 (otherwise, re-do the steps to start python and set up a celery app. You will not need twitter credentials.
 Then set task_id = the task_id you saved above)
