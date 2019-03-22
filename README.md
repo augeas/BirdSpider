@@ -93,7 +93,6 @@ To start a user scrape, call the celery twitter_task seedUser with scrape='True'
 from celery import Celery
 app = Celery('birdspider', broker='redis://localhost:6379', backend='redis://localhost:6379')
 app.send_task('twitter_tasks.seedUser', args=['emfcamp', 'True'])
-
 ```
 
 ### Halting a running scrape
@@ -102,6 +101,7 @@ A user scrape has a stopping condition within it, but you may sometimes wish to 
 Scraping a user checks that the cache key user_scrape == 'true' to signal 'keep going'
 If you wish to halt a running scrape before it finishes, for the moment you should change this key to 'false'.
 To do this you will need to keep the task_id returned as the result of calling Celery app.send_task
+
 result = app.send_task(task_name,args=[arg0,arg1..., argn])
 task_id = result.task_id
 
@@ -115,7 +115,7 @@ app.send_task('twitter_tasks.stop_scrape', args=[task_id])
 
 ```
 
-this can also be done by directly editing th cache keys in redis
+this can also be done by directly editing the cache keys in redis
 
 ```python
 import redis
@@ -125,6 +125,25 @@ cache = redis.StrictRedis(host='localhost')
 cache.set('user_scrape_' + task_id, 'false')
 
 ```
+
+### Running a twiiter search (for historical tweets on a search term) ###
+Please see the Twitter API documentation for details on possible search term formats
+There are optional keyword arguments as well as the search terms
+the most useful ones have the following defaults if not overridden:
+page_size=100
+lang='en'
+maxTweets=False (search will not cut itself off before hitting the twitter API limit on  a search result,
+                 can instead be set to a numeric value to limit the total number of tweets returned)
+Below are examples both just using the defaults and using the keyword args:
+
+```python
+from celery import Celery
+app = Celery('birdspider', broker='redis://localhost:6379', backend='redis://localhost:6379')
+app.send_task('twitter_tasks.search', args=['#emfcamp'])
+app.send_task('twitter_tasks.search', args=['#emfcamp'], kwargs={'maxTweets' : 300})
+```
+
+
 
 ### Passing User level OAUTH1 credentials to twitter tasks ###
 
@@ -148,6 +167,40 @@ Note: the user should have authorised the application, also note that at the mom
 
  ```
 
+###  Running and stopping a twitter filter stream task ###
+
+The filter stream task requires user level OAUTH1 credentials to run
+(all other twitter API calls can use either OAUTH2 or OAUTH1)
+
+The twitter filter API call can be accessed from BirdSpider.
+See Twitter's API documentation for limitation on the filter terms
+
+Be certain to save the task_id for the job that starts the filter stream, as you will need to to request BirdSpider
+to stop streaming tweets.
+
+
+```python
+ import json
+ from celery import Celery
+
+ app = Celery('birdspider', broker='redis://localhost:6379', backend='redis://localhost:6379')
+
+ credentials = {
+     'oauth1_token': 'your_user_oauth_token_here',
+     'oauth1_secret': 'your_user_oauth_secret_here',
+  }
+ result = app.send_taskapp.send_task('twitter_tasks.start_stream',  kwargs={'track': '#RevokeArticle50', 'credentials': json.dumps(credentials)})
+ task_id = result.task_id
+....
+
+To stop a filter stream
+Use the task_id saved when starting the stream
+Presuming you are still in the same python session as when you requested the stream to start do the following.
+(otherwise, re-do the steps to start python and set up a celery app. You will not need twitter credentials.
+Then set task_id = the task_id you saved above)
+```
+app.send_task('twitter_tasks.stop_stream', args=[task_id])
+....
 
 ### Clustering around a twitter user
 

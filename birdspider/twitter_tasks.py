@@ -91,16 +91,16 @@ def start_stream(self, track=None, follow=False, credentials=False):
     # TODO one of filter_terms or follow is required, return error if neither present
     # start the stream
     stream_task = stream_filter.delay(credentials=credentials, track=track)
-    cache.set("stream_id_" + self.request.id, stream_task.id)
+    cache.set("stream_id_" + self.request.id, stream_task.id.encode('utf-8'))
 
 
 @app.task(name='twitter_tasks.stop_stream', bind=True)
 def stop_stream(self, task_id):
 
     # stop the stream running in the stream started by the given task id
-    stream_id = cache.get("stream_id_" + task_id)
-    logger.info('***Stopping twitter filter streamer in task id: '  + stream_id + ' ***')
-    cache.set('stream_' + stream_id + '_connected', False)
+    logger.info('***Stopping twitter filter streamer ***')
+    stream_id = cache.get("stream_id_" + task_id).decode('utf-8')
+    revoke(stream_id, terminate=True)
     # clean up the cache
 
 
