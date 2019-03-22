@@ -1,6 +1,7 @@
 # Licensed under the Apache License Version 2.0: http://www.apache.org/licenses/LICENSE-2.0.txt
 
 from datetime import datetime
+import logging
 import re
 
 """
@@ -33,19 +34,19 @@ def renderTwitterUser(user):
 
 def renderTweet(tweet, get_user=False):
     """Return a serializable dictionary of relevant fields for a tweet."""
-    rendered = {field:tweet[field] for field in tweetFields if tweet.get(field,False)}
-    if tweet.get('created_at',False):
+    rendered = {field: tweet[field] for field in tweetFields if tweet.get(field, False)}
+    if tweet.get('created_at', False):
         rendered['isotime'] = twitterTime(tweet['created_at'])
-    if tweet.get('coordinates',False):
+    if tweet.get('coordinates', False):
         lng, lat = tweet['coordinates']['coordinates']
         rendered['longitude'] = lng
         rendered['latitude'] = lat
     if get_user:
-        if tweet.get('user',False):
+        if tweet.get('user', False):
             rendered_user = renderTwitterUser(tweet['user'])
         else:
             rendered_user = False
-        return (rendered,rendered_user)
+        return (rendered, rendered_user)
     else:
         return rendered
 
@@ -54,11 +55,11 @@ entity_types = ['user_mentions', 'hashtags', 'urls']
 
 def pushEntities(tweet, entity_store):
     tweet_id = tweet['id_str']
-    entities = tweet.get('entities',False)
-    if entities:    
+    entities = tweet.get('entities', False)
+    if entities:
         for item in entities['user_mentions']:
             entity_store['user_mentions'].append(
-                (tweet_id,renderTwitterUser(item)))
+                (tweet_id, renderTwitterUser(item)))
         for key in entity_types[1:]:
             for item in entities[key]:
                 item.pop('indices')
@@ -67,13 +68,13 @@ def pushEntities(tweet, entity_store):
     if extended:
         for item in extended['media']:
             for key in ['indices', 'sizes', 'video_info', 'additional_media_info']:
-                if item.get(key,False):
+                if item.get(key, False):
                     item.pop(key)
             entity_store['media'].append((tweet_id, item))
 
 
 def entityStore():
-    ents = {key:[] for key in entity_types}
+    ents = {key: [] for key in entity_types}
     ents['media'] = []
     return ents
 
@@ -96,33 +97,34 @@ def decomposeTweets(tweets):
     all_retweets = []
     all_quote_tweets = []
     all_users = {}
+    all_tweet_screen_names = []
     
     all_entities = {key:entityStore() for key in ['tweet', 'retweet', 'quotetweet']}
     
     for tweet in tweets:
         
-        retweeted = tweet.get('retweeted_status',False)
-        quoted_status = tweet.get('quoted_status',False)
+        retweeted = tweet.get('retweeted_status', False)
+        quoted_status = tweet.get('quoted_status', False)
         
         if retweeted and not quoted_status:
             raw = retweeted
             rendered_tweet, rendered_user = renderTweet(raw, get_user=True)
-            rendered_retweet = renderTweet(tweet)
-            all_retweets.append((rendered_tweet, rendered_retweet))
+            rendered_retweet, rendered_retweeter = renderTweet(tweet, get_user=True)
+            all_retweets.append((rendered_tweet, rendered_retweeter['screen_name'], rendered_retweet))
             pushEntities(raw, all_entities['retweet'])
             all_users[rendered_tweet['id_str']] = rendered_user
         
         if quoted_status and not retweeted:
             raw = quoted_status
             rendered_tweet, rendered_user = renderTweet(raw, get_user=True)
-            rendered_quote_tweet = renderTweet(tweet)
-            all_quote_tweets.append((rendered_tweet, rendered_quote_tweet))
+            rendered_quote_tweet, rendered_quote_tweeter = renderTweet(tweet, get_user=True)
+            all_quote_tweets.append((rendered_tweet, rendered_quote_tweeter['screen_name'], rendered_quote_tweet))
             pushEntities(raw, all_entities['quotetweet'])
             all_users[rendered_tweet['id_str']] = rendered_user
         
         if not retweeted and not quoted_status:
-            rendered_tweet = renderTweet(tweet)
-            all_tweets.append((rendered_tweet,))
+            rendered_tweet, rendered_tweeter = renderTweet(tweet, get_user=True)
+            all_tweets.append((rendered_tweet, rendered_tweeter['screen_name'], rendered_tweet))
             pushEntities(tweet, all_entities['tweet'])
 
     all_replies = {}

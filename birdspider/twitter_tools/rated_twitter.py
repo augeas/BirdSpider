@@ -17,10 +17,12 @@ class RatedTwitter(object):
 
     def __init__(self, use_app=True, credentials=False):
         if credentials:
-            oauth1_token = credentials.get('oauth1_token')
-            oauth1_secret = credentials.get('oauth1_secret')
+            creds=json.loads(credentials)
+            oauth1_token = creds.get('oauth1_token')
+            oauth1_secret = creds.get('oauth1_secret')
             logging.info("*** Calls to Twitter APIs will use user provided OAUTH1 user authentication token and secret ***")
             self.twitter = Twython(CONSUMER_KEY, CONSUMER_SECRET, oauth1_token, oauth1_secret)
+            self.handle = 'user_'
         elif use_app:
             logging.info("*** Calls to Twitter APIs will use preconfigured OAUTH2 application authentication ***")
             self.twitter = Twython(CONSUMER_KEY, access_token=ACCESS_TOKEN, oauth_version=2)
@@ -29,7 +31,7 @@ class RatedTwitter(object):
             logging.info("*** Calls to Twitter APIs will use preconfigured OAUTH1 user authentication token and secret ***")
             self.twitter = Twython(CONSUMER_KEY, CONSUMER_SECRET, OAUTH_TOKEN, OAUTH_TOKEN_SECRET)
             self.handle = 'local_'
-            
+
     def can_we_do_that(self, method_name):
         """Check whether a given API call is rate-limited, return the estimated time to wait in seconds.
     

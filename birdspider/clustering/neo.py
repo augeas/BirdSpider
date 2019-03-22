@@ -47,7 +47,6 @@ def clustering_to_neo(db, seed, seed_type, seed_id_label, adjacency_criteria):
         CREATE (a:clustering {timestamp: d.timestamp, adjacency_criteria: d.adjacency_criteria})
         RETURN id(a)'''
 
-
     with db.session() as session:
         with session.begin_transaction() as tx:
             clustering_id = tx.run(create_query, data=clustering_data).single().value()

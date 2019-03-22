@@ -8,7 +8,49 @@ import json
 import logging
 import redis
 from datetime import datetime, timedelta
-from db_settings import get_neo_driver, cache
+from db_settings import cache
+
+
+def start_user_crawl(db, user, crawl_task, status='initiated'):
+    """ Crawl centred on a user """
+    started = datetime.now()
+    right_now = started.isoformat()
+
+    # push new node to neo4j
+    crawl_data = {'timestamp': right_now, 'crawl_task': crawl_task, 'status': status}
+    create_query = '''UNWIND {data} AS d
+        CREATE (a:crawl {timestamp: d.timestamp, crawl_task: d.crawl_task, status: d.status})
+        RETURN id(a)'''
+
+    with db.session() as session:
+        with session.begin_transaction() as tx:
+            crawl_id = tx.run(create_query, data=crawl_data).single().value()
+
+    # relationship: crawl--centred_on-->user
+    match = "MATCH (c:crawl), (t:twitter_user {{screen_name: '{}'}}) WHERE ID(c) = {}".format(user, crawl_id)
+
+    merge = "MERGE (c)-[:CENTRED_ON]->(t)"
+
+    relation_query = '\n'.join(['UNWIND {data} AS d', match, merge])
+    with db.session() as session:
+        with session.begin_transaction() as tx:
+            tx.run(relation_query, data=user)
+
+    return crawl_id
+
+
+def update_crawl(db, crawl_task, status):
+    updated = datetime.now()
+    right_now = updated.isoformat()
+
+    match = "MATCH  (c:crawl {{crawl_task: '{}'}})".format(crawl_task)
+    update = "SET c.status = '{}', c.timestamp = '{}'".format(status, right_now)
+    query = '\n'.join([match, update])
+
+    with db.session() as session:
+        with session.begin_transaction() as tx:
+            tx.run(query)
+
 
 
 #TODO: make sure this query really does the following
@@ -62,8 +104,6 @@ def nextTweets(db, latest=False, max_friends=2000, max_followers=2000, limit=20,
         AND NOT EXISTS (a.protected) AND NOT EXISTS (a.defunct)
         RETURN a.screen_name
         ORDER BY a.last_scraped {} LIMIT {}""".format(max_tweets, max_followers, max_friends, desc, limit)
-
-    neoDb = get_neo_driver()
 
     with db.session() as session:
         with session.begin_transaction() as tx:
