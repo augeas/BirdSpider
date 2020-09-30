@@ -1,5 +1,5 @@
 celery
-neo4j-driver
+neo4j
 networkx
 numpy
 redis

@@ -40,7 +40,7 @@ def mergeRel(src, rel, dest):
 
 
 def unwind_query(*clauses):
-    return '\n'.join(['UNWIND {data} AS d'] + list(clauses))
+    return '\n'.join(['UNWIND $data AS d'] + list(clauses))
 
 
 def neo_tx(db, query, data=None):
@@ -107,7 +107,7 @@ def connections2Neo(db, user, renderedTwits, friends=True):
         merge = "MERGE (t)<-[:FOLLOWS]-(f)"
         update = "SET {}.followers_last_scraped = '{}'".format('t'+user, right_now)
             
-    query = '\n'.join(['UNWIND {data} AS d', match, merge])
+    query = '\n'.join(['UNWIND $data AS d', match, merge])
     
     data = [{'screen_name': twit.get('screen_name', False)}
         for twit in renderedTwits if twit.get('screen_name', False)]

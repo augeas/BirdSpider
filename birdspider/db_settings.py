@@ -1,7 +1,7 @@
 # Licensed under the Apache License Version 2.0: http://www.apache.org/licenses/LICENSE-2.0.txt
 from os import environ
 
-from neo4j.v1 import GraphDatabase
+from neo4j import GraphDatabase
 import redis
 
 try:
@@ -11,13 +11,13 @@ except:
 
 neo_host = environ.get('NEO_HOST', 'localhost')
 
-uri = "bolt://{}:7687".format(neo_host)
+uri = "neo4j://{}:7687".format(neo_host)
 
 def get_neo_driver():
     neo_user = environ.get('NEO_USER', False)
     neo_pass = environ.get('NEO_PW', False)
     if neo_user and neo_pass:
-        return GraphDatabase.driver(uri, auth=(neo_user, neo_pass))
+        return GraphDatabase.driver(uri, auth=(neo_user, neo_pass), encrypted=False)
     else:
         return None
 

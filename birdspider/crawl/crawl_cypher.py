@@ -18,7 +18,7 @@ def start_user_crawl(db, user, crawl_task, status='initiated'):
 
     # push new node to neo4j
     crawl_data = {'timestamp': right_now, 'crawl_task': crawl_task, 'status': status}
-    create_query = '''UNWIND {data} AS d
+    create_query = '''UNWIND $data AS d
         CREATE (a:crawl {timestamp: d.timestamp, crawl_task: d.crawl_task, status: d.status})
         RETURN id(a)'''
 
@@ -31,7 +31,7 @@ def start_user_crawl(db, user, crawl_task, status='initiated'):
 
     merge = "MERGE (c)-[:CENTRED_ON]->(t)"
 
-    relation_query = '\n'.join(['UNWIND {data} AS d', match, merge])
+    relation_query = '\n'.join(['UNWIND $data AS d', match, merge])
     with db.session() as session:
         with session.begin_transaction() as tx:
             tx.run(relation_query, data=user)
